@@ -1,0 +1,13 @@
+﻿{
+	"RoxyExample.Category.Gameplay": "Gameplay",
+	"RoxyExample.Category.Visual": "Visual",
+	"RoxyExample.Category.Input": "Input",
+	"RoxyExample.Gameplay.Speed": "Global Speed",
+	"RoxyExample.Gameplay.Speed.Desc": "Multiplies the overall playback speed.",
+	"RoxyExample.Visual.TrailStyle": "Trail Style",
+	"RoxyExample.Visual.TrailStyle.Desc": "Choose the trail render style.",
+	"RoxyExample.Visual.ShowStats": "Show Stats",
+	"RoxyExample.Visual.ShowStats.Desc": "Show in-game statistics.",
+	"RoxyExample.Input.MaxCombo": "Max Combo",
+	"RoxyExample.Input.MaxCombo.Desc": "Upper bound of the combo counter."
+}

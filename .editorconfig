@@ -1,0 +1,41 @@
+root = true
+
+[*]
+charset = utf-8-bom          # 推荐 BOM；若 IDE 报错可改 utf-8
+end_of_line = crlf
+insert_final_newline = true  # 文件末尾保留空行
+indent_style = tab           # 缩进用 Tab
+indent_size = 4
+
+[*.cs]
+indent_style = tab
+indent_size = 4
+
+# 大括号不换行（K&R）
+csharp_new_line_before_open_brace = none
+csharp_new_line_before_open_brace = none:methods, properties, statements, lambdas
+
+# using 排序（系统优先）
+dotnet_sort_system_directives_first = true
+
+# 命名规则（suggestion 级，配合 VS 波浪线提示）
+dotnet_naming_style.pascal_style.naming_style = pascal_case
+dotnet_naming_style.snake_style.naming_style = snake_case
+
+dotnet_naming_symbols.locals.applicable_kinds = local, parameter
+dotnet_naming_symbols.locals.applicable_accessibilities = *
+dotnet_naming_rule.locals_should_be_snake.symbols = locals
+dotnet_naming_rule.locals_should_be_snake.style = snake_style
+dotnet_naming_rule.locals_should_be_snake.severity = suggestion
+
+dotnet_naming_symbols.fields.applicable_kinds = field
+dotnet_naming_symbols.fields.applicable_accessibilities = *
+dotnet_naming_rule.fields_should_be_pascal.symbols = fields
+dotnet_naming_rule.fields_should_be_pascal.style = pascal_style
+dotnet_naming_rule.fields_should_be_pascal.severity = suggestion
+
+dotnet_naming_symbols.const_fields.applicable_kinds = field
+dotnet_naming_symbols.const_fields.required_modifiers = const
+dotnet_naming_rule.const_fields_should_be_screaming.symbols = const_fields
+dotnet_naming_rule.const_fields_should_be_screaming.style = pascal_style
+dotnet_naming_rule.const_fields_should_be_screaming.severity = suggestion

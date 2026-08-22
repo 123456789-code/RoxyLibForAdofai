@@ -1,0 +1,10 @@
+﻿{
+	"Id": "RoxyExample",
+	"DisplayName": "Roxy Example",
+	"Author": "You",
+	"Version": "0.1.0",
+	"ManagerVersion": "0.28.0",
+	"AssemblyName": "RoxyExample.dll",
+	"EntryMethod": "RoxyExample.Main.Setup",
+	"Requirements": [ "RoxyLib" ]
+}

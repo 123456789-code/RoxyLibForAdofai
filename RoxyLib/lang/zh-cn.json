@@ -1,0 +1,18 @@
+﻿{
+	"RoxyLib.Window.Title": "模组设置",
+	"RoxyLib.Left.Title": "模组",
+	"RoxyLib.Search.Placeholder": "搜索...",
+	"RoxyLib.Rule.Empty": "无规则",
+	"RoxyLib.Rule.Reset": "重置",
+	"RoxyLib.UMM.OpenConfig": "打开设置界面",
+	"RoxyLib.Category.General": "通用",
+	"RoxyLib.Category.Developer": "开发者",
+	"RoxyLib.General.OpenSettings": "打开设置界面",
+	"RoxyLib.General.OpenSettings.Desc": "打开设置界面窗口",
+	"RoxyLib.General.Language": "语言",
+	"RoxyLib.General.Language.Desc": "选择一个语言，默认为英文",
+	"RoxyLib.Developer.DebugLogLevel": "日志等级",
+	"RoxyLib.Developer.DebugLogLevel.Desc": "日志等级: 0=off, 1=error, 2=warning, 3=info",
+	"RoxyLib.Keybind.Press": "请按下按键..."
+}
+

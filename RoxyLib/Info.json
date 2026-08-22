@@ -1,0 +1,10 @@
+﻿{
+	"Id": "RoxyLib",
+	"DisplayName": "RoxyLib",
+	"Author": "Wang125510",
+	"Version": "0.1.0",
+	"ManagerVersion": "0.28.0",
+	"AssemblyName": "RoxyLib.dll",
+	"EntryMethod": "RoxyLib.Main.Setup",
+	"Requirements": []
+}

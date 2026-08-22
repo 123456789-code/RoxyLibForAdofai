@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RoxyExample/RoxyExample.csproj" />
+  <Project Path="RoxyLib/RoxyLib.csproj" />
+</Solution>

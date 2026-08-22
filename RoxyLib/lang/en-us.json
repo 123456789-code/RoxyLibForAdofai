@@ -1,0 +1,17 @@
+﻿{
+	"RoxyLib.Window.Title": "RoxyLib Settings",
+	"RoxyLib.Left.Title": "MODS",
+	"RoxyLib.Search.Placeholder": "Search...",
+	"RoxyLib.Rule.Empty": "No rules",
+	"RoxyLib.Rule.Reset": "Reset",
+	"RoxyLib.UMM.OpenConfig": "Open Config Screen",
+	"RoxyLib.Category.General": "General",
+	"RoxyLib.Category.Developer": "Developer",
+	"RoxyLib.General.OpenSettings": "Open Settings",
+	"RoxyLib.General.OpenSettings.Desc": "Open Settings Window",
+	"RoxyLib.General.Language": "Language",
+	"RoxyLib.General.Language.Desc": "Choose Language, Default English",
+	"RoxyLib.Developer.DebugLogLevel": "Debug Log Level",
+	"RoxyLib.Developer.DebugLogLevel.Desc": "Debug log level: 0=off, 1=error, 2=warning, 3=info",
+	"RoxyLib.Keybind.Press": "Press Key..."
+}

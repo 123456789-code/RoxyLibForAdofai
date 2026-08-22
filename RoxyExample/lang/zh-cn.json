@@ -1,0 +1,13 @@
+﻿{
+	"RoxyExample.Category.Gameplay": "玩法",
+	"RoxyExample.Category.Visual": "视觉",
+	"RoxyExample.Category.Input": "输入",
+	"RoxyExample.Gameplay.Speed": "全局速度",
+	"RoxyExample.Gameplay.Speed.Desc": "整体播放速度倍率",
+	"RoxyExample.Visual.TrailStyle": "拖尾样式",
+	"RoxyExample.Visual.TrailStyle.Desc": "选择拖尾渲染样式",
+	"RoxyExample.Visual.ShowStats": "显示统计",
+	"RoxyExample.Visual.ShowStats.Desc": "在游戏内显示统计数据",
+	"RoxyExample.Input.MaxCombo": "连击上限",
+	"RoxyExample.Input.MaxCombo.Desc": "连击计数器的上限"
+}

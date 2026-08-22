@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net481</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>RoxyExample</RootNamespace>
+    <AssemblyName>RoxyExample</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RoxyLib\RoxyLib.csproj" Private="false" />
+    <Reference Include="UnityModManager">
+      <HintPath>$(GameManagedDir)\UnityModManager\UnityModManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameManagedDir)\UnityModManager\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GameManagedDir)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="Info.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="lang\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
