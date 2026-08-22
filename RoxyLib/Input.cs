@@ -39,7 +39,10 @@ public readonly struct KeyCombination {
 /// 单个按键绑定，包含所属 Mod、名称、当前组合，并提供状态查询和事件
 /// </summary>
 public sealed class RoxyKeybind {
-	public KeyCombination Combination { get; set; }
+	public KeyCombination Combination { get; set {
+		field = value;
+		WasDown = IsDown();
+	} }
 	private bool WasDown { get; set; }
 	public event Action? Activated;
 
