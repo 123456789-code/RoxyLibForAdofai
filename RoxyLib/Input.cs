@@ -2,10 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using RoxyLib.Rules;
+using UnityEngine;
 
 namespace RoxyLib.Input;
-
-using UnityEngine;
 
 /// <summary>
 /// 表示一个按键组合，由多个 <see cref="KeyCode"/> 组成（如 Ctrl+Shift+A）
@@ -17,20 +16,19 @@ public readonly struct KeyCombination {
 		Keys = keys;
 	}
 
-	public static KeyCombination None => new KeyCombination();
+	public static KeyCombination None => new();
 
 	public override string ToString() {
-		if (Keys == null || Keys.Length == 0) {
-			return "None";
-		}
-		return string.Join("+", Keys.Select(key => key.ToString()));
+		return (Keys is null || Keys.Length == 0)
+			? "None"
+			: string.Join("+", Keys.Select(key => key.ToString()));
 	}
 
 	public static KeyCombination Parse(string text) {
 		if (string.IsNullOrEmpty(text) || text == "None")
 			return None;
 		string[] parts = text.Split('+');
-		KeyCode[] keys = parts.Select(p => (KeyCode)Enum.Parse(typeof(KeyCode), p.Trim())).ToArray();
+		KeyCode[] keys = [.. parts.Select(p => (KeyCode)Enum.Parse(typeof(KeyCode), p.Trim()))];
 		return new KeyCombination(keys);
 	}
 }
@@ -65,10 +63,7 @@ public sealed class RoxyKeybind {
 
 	public bool IsDown() {
 		KeyCode[] keys = Combination.Keys;
-		if (keys == null || keys.Length == 0) {
-			return false;
-		}
-		return keys.All(key => UnityEngine.Input.GetKey(key));
+		return !(keys is null || keys.Length == 0) && keys.All(UnityEngine.Input.GetKey);
 	}
 }
 
@@ -76,7 +71,7 @@ public sealed class RoxyKeybind {
 /// 按键绑定管理器
 /// </summary>
 public static class RoxyInput {
-	private static List<RoxyKeybind> Keybinds = new List<RoxyKeybind>();
+	private readonly static List<RoxyKeybind> Keybinds = [ ];
 
 	public static void UpdateKeybindings() {
 		Keybinds.Clear();

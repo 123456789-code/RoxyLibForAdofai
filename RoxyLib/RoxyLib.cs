@@ -19,10 +19,9 @@ public static class RoxyLib {
 	public const string CONFIG_FILE = "config.json";
 	public const string LANG_DIR = "lang";
 
-	private static readonly List<RoxyHost> Hosts = new List<RoxyHost>();
-	private static readonly RoxyGui Gui = new RoxyGui();
+	private static readonly List<RoxyHost> Hosts = [ ];
+	private static readonly RoxyGui Gui = new();
 	private static float LastSaveTime; // 最后一次存储数据的时间
-	public static bool Ready { get; private set; } // GUI是否准备好
 	public static bool Dirty { get; internal set; } // 是否有未存储的数据
 	public static long Revision { get; private set; } // mod 列表变化的计数器
 
@@ -31,10 +30,6 @@ public static class RoxyLib {
 	public static event Action<long>? RevisionChanged;
 
 	public static void Register(UnityModManager.ModEntry mod_entry) {
-		if (!Ready) {
-			Ready = true;
-			Gui.Initialize();
-		}
 		mod_entry.OnToggle = ToggleHandler;
 		mod_entry.OnSaveGUI = entry => SaveAll();
 	}
@@ -69,9 +64,13 @@ public static class RoxyLib {
 		Dirty = false;
 	}
 
-	public static void OpenSettings() => Gui.OpenFromExternal();
+	public static void OpenSettings() {
+		Gui.OpenFromExternal();
+	}
 
-	public static IReadOnlyList<RoxyHost> GetHosts() => Hosts.AsReadOnly();
+	public static IReadOnlyList<RoxyHost> GetHosts(){
+		return Hosts.AsReadOnly();
+	}
 
 	private static bool ToggleHandler(UnityModManager.ModEntry mod_entry, bool value) {
 		if (value) {

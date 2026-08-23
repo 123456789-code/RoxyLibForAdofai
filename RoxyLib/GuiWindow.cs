@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using RoxyLib.Input;
@@ -34,7 +34,6 @@ public sealed class RoxyGui {
 	// ---- 状态 ----
 	private string SelectedModId = RoxyLib.MOD_ID; // 当前选中的 mod（默认选中 RoxyLib 自身）
 	private string SearchText = "";                // 搜索关键词
-	private bool Ready;                            // 是否已初始化（防重复）
 	private bool Dirty;                            // 需要重建界面（注册/语言/值变更后置位）
 	private bool CapturingKeybind;                 // 是否处于快捷键捕获状态
 	private RuleInfo? CaptureRule;                 // 正在捕获快捷键的规则
@@ -42,19 +41,24 @@ public sealed class RoxyGui {
 
 	public bool IsOpen { get; private set; }
 
-	/// <summary>外部入口（UMM 设置按钮等）打开设置界面。</summary>
-	public void OpenFromExternal() => SetOpenSettingsValue(true);
-
-	/// <summary>首次创建 Canvas 与窗口 UI，并订阅 RoxyLib 的注册/变更事件。</summary>
-	public void Initialize() {
-		if (Ready) {
-			return;
-		}
-		Ready = true;
-		CreateRootUi();
+	public RoxyGui() {
+		// 构造函数只订阅事件，不建 UI：此时语言表可能尚未加载（LoadLangDir 在注册后才跑），
+		// 建 UI 会触发翻译读取，所以 UI 延迟到首次打开窗口时构建。
 		RoxyLib.ModRegistered += OnModRegistered;
 		RoxyLib.ModUnregistered += _ => Dirty = true;
 		RoxyLib.RevisionChanged += _ => Dirty = true;
+	}
+
+	/// <summary>外部入口（UMM 设置按钮等）打开设置界面。</summary>
+	public void OpenFromExternal() {
+		SetOpenSettingsValue(true);
+	}
+
+	/// <summary>UI 未构建时惰性构建（首次打开窗口时，此时语言已加载）。Root 为 null 即未构建。</summary>
+	private void EnsureRoot() {
+		if (Root == null) {
+			CreateRootUi();
+		}
 	}
 
 	/// <summary>某 mod 注册完成：若为 RoxyLib 自身，订阅其 OpenSettings（开关窗口）与 Language（切语言刷新）。</summary>
@@ -114,6 +118,9 @@ public sealed class RoxyGui {
 	/// <summary>直接设置窗口显示状态（由 OpenSettings 规则值驱动）。</summary>
 	private void SetOpen(bool open) {
 		IsOpen = open;
+		if (open) {
+			EnsureRoot(); // 打开前确保 UI 已构建（首次打开时创建，此时语言已加载）
+		}
 		if (Window != null) {
 			Window.gameObject.SetActive(open);
 		}
@@ -306,7 +313,9 @@ public sealed class RoxyGui {
 		BuildRulePanel();
 	}
 
-	private string T(string key, string fallback) => RoxyLang.Translate(key, fallback);
+	private string T(string key, string fallback) {
+		return RoxyLang.Translate(key, fallback);
+	}
 
 	// ---------------- 左栏 ----------------
 
@@ -675,7 +684,9 @@ public sealed class RoxyGui {
 
 	// ---------------- 工具 ----------------
 
-	private static string FormatValue(object value) => value is float f ? f.ToString("0.##") : value?.ToString() ?? "";
+	private static string FormatValue(object value) {
+		return value is float f ? f.ToString("0.##") : value?.ToString() ?? "";
+	}
 
 	private static bool TryParseNumber(string text, bool is_int, out object value) {
 		value = null!;

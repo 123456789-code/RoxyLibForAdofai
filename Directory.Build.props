@@ -1,4 +1,4 @@
-<Project>
+﻿<Project>
   <PropertyGroup>
     <GameDir>D:\Program Files (x86)\Steam\steamapps\common\A Dance of Fire and Ice</GameDir>
     <GameManagedDir>$(GameDir)\A Dance of Fire and Ice_Data\Managed</GameManagedDir>
@@ -7,9 +7,4 @@
     <Nullable>enable</Nullable>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
-  <!-- 构建后清理被 SDK 连带复制的游戏程序集副本，避免污染 Mods 目录 -->
-  <!-- 仅对非 RoxyLib 项目生效，防止误删 RoxyLib 自身主 dll -->
-  <Target Name="CleanDuplicateUnityAssemblies" AfterTargets="Build" Condition="'$(MSBuildProjectName)' != 'RoxyLib'">
-    <Delete Files="$(TargetDir)\UnityEngine.SharedInternalsModule.dll;$(TargetDir)\netstandard.dll;$(TargetDir)\dnlib.dll;$(TargetDir)\RoxyLib.dll;$(TargetDir)\RoxyLib.pdb" />
-  </Target>
 </Project>
