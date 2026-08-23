@@ -458,7 +458,7 @@ public sealed class RoxyGui {
 
 	/// <summary>规则卡片行：名称标签（可翻译）+ 中部控件区 + 右侧重置按钮。</summary>
 	private float AddRuleRow(RuleInfo rule, float y) {
-		float height = rule.RuleType == RoxyRuleType.Color ? 128 : UiFactory.Theme.RowHeight;
+		float height = rule.RuleType == RoxyRuleType.Color ? 152 : UiFactory.Theme.RowHeight;
 		RectTransform row = UiFactory.CreateRoundedPanel("Rule_" + rule.Name, RuleContent!, UiFactory.Theme.PanelLight);
 		UiFactory.PlaceRow(row, RuleContent!, y, height);
 		row.offsetMin = new Vector2(6, row.offsetMin.y);
@@ -573,47 +573,45 @@ public sealed class RoxyGui {
 		Dropdowns.Add(dropdown);
 	}
 
-	/// <summary>Color 规则控件：色块预览 + RGBA 四条滑条/输入框。</summary>
+	/// <summary>Color 规则控件：右上角色块预览 + RGBA 四条「标签-滑块-输入框」行。</summary>
+	/// <remarks>布局要点：行横贯控件区不偏移（不溢出到重置按钮）；滑块精确夹在标签与输入框之间。</remarks>
 	private void BuildColorControl(RuleInfo rule, RectTransform control) {
 		Color color = (Color)rule.GetValue();
 		RectTransform holder = UiFactory.CreateRect("ColorHolder", control);
-		holder.anchorMin = Vector2.zero;
-		holder.anchorMax = Vector2.one;
-		holder.offsetMin = Vector2.zero;
-		holder.offsetMax = Vector2.zero;
+		UiFactory.Stretch(holder);
 
+		// 色块预览：右上角，行从 y=44 开始，互不遮挡
 		RectTransform swatch = UiFactory.CreateRoundedPanel("Swatch", holder, color);
-		UiFactory.SetRect(swatch, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 28), new Vector2(44, 30));
+		UiFactory.SetRect(swatch, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-10, -10), new Vector2(48, 32));
+
+		const float label_w = 24f;   // 左侧 RGBA 标签宽
+		const float field_w = 46f;   // 右侧输入框宽
+		const float gap = 8f;        // 控件间距
+		const float row_h = 24f;     // 行高
+		const float row_gap = 4f;    // 行间距
+		const float top = 44f;       // 首行距顶部（给右上角色块留空间）
 
 		float[] channels = { color.r, color.g, color.b, color.a };
 		string[] names = { "R", "G", "B", "A" };
+
 		for (int i = 0; i < 4; i++) {
 			int idx = i;
+
+			// 每行横贯整个控件区（anchoredPosition.x = 0，不偏移、不溢出）
 			RectTransform row = UiFactory.CreateRect("ColorRow" + i, holder);
-			UiFactory.SetRect(row, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, 1), new Vector2(52, -4 - i * 28), new Vector2(0, 24));
+			row.anchorMin = new Vector2(0, 1);
+			row.anchorMax = new Vector2(1, 1);
+			row.pivot = new Vector2(0.5f, 1);
+			row.anchoredPosition = new Vector2(0, -(top + i * (row_h + row_gap)));
+			row.sizeDelta = new Vector2(0, row_h);
+
+			// 左侧标签
 			UiFactory.CreateText("Name", row, names[i], UiFactory.Theme.FontSizeSmall, UiFactory.Theme.TextDim, TextAnchor.MiddleLeft)
-				.rectTransform.SetRectAt(0, 0, 22, 24);
+				.rectTransform.SetRectAt(0, 0, label_w, row_h);
 
-			RectTransform slider_holder = UiFactory.CreateRect("SliderHolder", row);
-			slider_holder.anchorMin = new Vector2(0, 0.5f);
-			slider_holder.anchorMax = new Vector2(1, 0.5f);
-			slider_holder.pivot = new Vector2(0.5f, 0.5f);
-			slider_holder.anchoredPosition = new Vector2(-42, 0);
-			slider_holder.sizeDelta = new Vector2(-84, 22);
-			Slider slider = UiFactory.CreateSlider("Slider", slider_holder, 0f, 1f, channels[i], v => {
-				Color c = (Color)rule.GetValue();
-				Color nc = ApplyChannel(c, idx, v);
-				if (rule.SetValue(nc, true)) {
-					swatch.GetComponent<Image>().color = nc;
-				}
-			});
-			UiFactory.Stretch(slider.GetComponent<RectTransform>());
-
+			// 右侧输入框（右对齐，始终在控件区内 → 不再被重置按钮遮住）
 			RectTransform field_holder = UiFactory.CreateRect("FieldHolder", row);
-			field_holder.anchorMin = new Vector2(1, 0.5f);
-			field_holder.anchorMax = new Vector2(1, 0.5f);
-			field_holder.pivot = new Vector2(1, 0.5f);
-			field_holder.sizeDelta = new Vector2(38, 22);
+			UiFactory.SetRect(field_holder, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f), Vector2.zero, new Vector2(field_w, row_h));
 			InputField field = UiFactory.CreateInputField("Field", field_holder, ((int)(channels[i] * 255)).ToString(), value => {
 				if (int.TryParse(value, out int byte_val) && byte_val >= 0 && byte_val <= 255) {
 					Color c = (Color)rule.GetValue();
@@ -624,6 +622,22 @@ public sealed class RoxyGui {
 				}
 			});
 			UiFactory.Stretch(field.GetComponent<RectTransform>());
+
+			// 中间滑块：精确填充「标签右缘」到「输入框左缘」之间
+			RectTransform slider_holder = UiFactory.CreateRect("SliderHolder", row);
+			slider_holder.anchorMin = new Vector2(0, 0.5f);
+			slider_holder.anchorMax = new Vector2(1, 0.5f);
+			slider_holder.pivot = new Vector2(0.5f, 0.5f);
+			slider_holder.anchoredPosition = new Vector2((label_w - field_w) * 0.5f, 0);
+			slider_holder.sizeDelta = new Vector2(-(label_w + field_w + gap * 2f), row_h - 2);
+			Slider slider = UiFactory.CreateSlider("Slider", slider_holder, 0f, 1f, channels[i], v => {
+				Color c = (Color)rule.GetValue();
+				Color nc = ApplyChannel(c, idx, v);
+				if (rule.SetValue(nc, true)) {
+					swatch.GetComponent<Image>().color = nc;
+				}
+			});
+			UiFactory.Stretch(slider.GetComponent<RectTransform>());
 		}
 	}
 

@@ -22,10 +22,10 @@ public enum LanguageEnum {
 /// </summary>
 public static class RoxyLang {
 	private static readonly ConcurrentDictionary<LanguageEnum, Dictionary<string, string>> Dict = new() {
-		[LanguageEnum.en_us] = { },
-		[LanguageEnum.zh_cn] = { },
-		[LanguageEnum.ja_jp] = { },
-		[LanguageEnum.ko_kr] = { }
+		[LanguageEnum.en_us] = new(),
+		[LanguageEnum.zh_cn] = new(),
+		[LanguageEnum.ja_jp] = new(),
+		[LanguageEnum.ko_kr] = new()
 	};
 
 	/// <summary>

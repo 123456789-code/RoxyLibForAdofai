@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -9,18 +9,15 @@ namespace RoxyLib.Gui;
 /// 主色 #66CCFF（青蓝）。所有控件工厂统一从这里取值，改主题只需改这一处。
 /// </summary>
 public sealed class RoxyTheme {
-	// ---- 主色 #66CCFF ----
-	public Color Accent = new Color(0.40f, 0.80f, 1.00f, 1f);        // 强调色（开关/滑块/选中）
-	public Color AccentDim = new Color(0.40f, 0.80f, 1.00f, 0.16f);   // 强调色淡（选中行底）
-	public Color AccentStrong = new Color(0.20f, 0.55f, 0.78f, 1f);   // 深强调（悬停/边框）
-
-	// ---- 中性色（深蓝灰，柔和）----
-	public Color Background = new Color(0.055f, 0.070f, 0.090f, 0.97f); // 窗口背景（近黑蓝）
-	public Color Panel = new Color(0.100f, 0.130f, 0.160f, 1f);          // 面板（左栏/右栏）
-	public Color PanelLight = new Color(0.160f, 0.200f, 0.250f, 1f);     // 控件底（按钮/输入框/卡片）
-	public Color PanelHover = new Color(0.220f, 0.270f, 0.330f, 1f);     // 悬停高亮
-	public Color Text = new Color(0.930f, 0.960f, 0.990f, 1f);           // 主文字（近白）
-	public Color TextDim = new Color(0.580f, 0.640f, 0.710f, 1f);        // 次要文字/占位
+	public Color Accent { get => RoxyLibRules.Accent; }
+	public Color AccentDim { get => RoxyLibRules.AccentDim; }
+	public Color AccentStrong { get => RoxyLibRules.AccentStrong; }
+	public Color Background { get => RoxyLibRules.Background; }
+	public Color Panel { get => RoxyLibRules.Panel; }
+	public Color PanelLight { get => RoxyLibRules.PanelLight; }
+	public Color PanelHover { get => RoxyLibRules.PanelHover; }
+	public Color Text { get => RoxyLibRules.Text; }
+	public Color TextDim { get => RoxyLibRules.TextDim; }
 
 	// ---- 尺寸 ----
 	public int FontSize = 14;            // 常规字号

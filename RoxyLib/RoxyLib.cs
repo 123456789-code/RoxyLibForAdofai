@@ -74,7 +74,7 @@ public static class RoxyLib {
 
 	private static bool ToggleHandler(UnityModManager.ModEntry mod_entry, bool value) {
 		if (value) {
-			RoxyHost host = RoxyHosts.FromUmm(mod_entry);
+			var host = new RoxyHost(mod_entry);
 			if (Hosts.Any(existing => existing.ModId == host.ModId))
 				return true;
 			Hosts.Add(host);
@@ -95,11 +95,7 @@ public static class RoxyLib {
 			RevisionChanged?.Invoke(++Revision);
 		}
 		else {
-			try {
-				object info = mod_entry.GetType().GetField("Info")!.GetValue(mod_entry)!;
-				Unregister((string)info.GetType().GetField("Id")!.GetValue(info)!);
-			}
-			catch { }
+			Unregister(mod_entry.Info.Id);
 		}
 		return true;
 	}

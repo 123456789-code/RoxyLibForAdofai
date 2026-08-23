@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using HarmonyLib;
+using UnityEngine;
 using UnityModManagerNet;
 
 namespace RoxyLib;
@@ -9,6 +10,8 @@ public static class Main {
 		RoxyLib.Register(mod_entry);
 		mod_entry.OnUpdate = (entry, dt) => RoxyLib.Tick(dt);
 		mod_entry.OnGUI = entry => DrawOpenSettingsButton();
+		var harmony = new Harmony("RoxyLib.InputBlock");
+		harmony.PatchAll(typeof(Input.InputBlockPatches).Assembly);
 	}
 
 	private static void DrawOpenSettingsButton() {

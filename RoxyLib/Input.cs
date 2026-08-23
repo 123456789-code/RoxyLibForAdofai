@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using HarmonyLib;
 using RoxyLib.Rules;
 using UnityEngine;
 
@@ -71,17 +72,28 @@ public sealed class RoxyKeybind {
 /// 按键绑定管理器
 /// </summary>
 public static class RoxyInput {
-	private readonly static List<RoxyKeybind> Keybinds = [ ];
+	private readonly static List<RoxyKeybind> Keybinds = [];
 
 	public static void UpdateKeybindings() {
 		Keybinds.Clear();
-		foreach(var rule in RoxyRules.GetRules(null))
-			if(rule.RuleType == RoxyRuleType.Switch && rule.Keybind is RoxyKeybind k)
+		foreach (var rule in RoxyRules.GetRules(null))
+			if (rule.RuleType == RoxyRuleType.Switch && rule.Keybind is RoxyKeybind k)
 				Keybinds.Add(k);
 	}
 
 	public static void Update(float dt) {
 		foreach (var keybind in Keybinds)
 			keybind.Poll();
+	}
+}
+
+[HarmonyPatch(typeof(RDInputType_Keyboard), "CheckKeyState")]
+internal static class InputBlockPatches {
+	static bool Prefix(ref bool __result) {
+		if (RoxyLibRules.OpenSettings) {
+			__result = false; // 游戏以为这个键没按
+			return false;     // 跳过原方法
+		}
+		return true;
 	}
 }
