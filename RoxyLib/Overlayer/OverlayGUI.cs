@@ -73,14 +73,14 @@ public sealed class OverlayGUI {
 
 	private void CreateOverlay(OverlayInfo o) {
 		RectTransform parent = o.OverlayType switch {
-			OverlayType.LeftTop => LeftRoot,
-			OverlayType.RightTop => RightRoot,
-			_ => Root,
+			OverlayType.LeftTop => LeftRoot!,
+			OverlayType.RightTop => RightRoot!,
+			_ => Root!,
 		};
 		if (parent == null)
 			return;
 
-		Text text = UiFactory.CreateText("Overlay_" + o.Name, parent, FormatText(o, o.Name), 16, GetOverlayColor(o));
+		Text text = UiFactory.CreateText(o.Name, parent, FormatText(o, o.Name), 16, GetOverlayColor(o));
 		text.alignment = TextAnchor.MiddleLeft;
 		text.horizontalOverflow = HorizontalWrapMode.Overflow;
 		text.verticalOverflow = VerticalWrapMode.Overflow;
@@ -144,7 +144,7 @@ public sealed class OverlayGUI {
 	private void ApplyVisibility(OverlayInfo o) {
 		if (!Rects.TryGetValue(o, out var rect) || rect == null)
 			return;
-		bool visible = o.RuleB != null ? (bool)o.RuleB.GetValue() : true;
+		bool visible = (bool)o.RuleB!.GetValue();
 		rect.gameObject.SetActive(visible);
 	}
 
@@ -182,7 +182,7 @@ public sealed class OverlayGUI {
 		if (!Rects.TryGetValue(o, out var rect) || rect == null)
 			return;
 
-		var align = o.RuleA != null ? (OverlayAlignment)o.RuleA.GetValue() : OverlayAlignment.MiddleMiddle;
+		var align = o.RuleA != null ? (OverlayAlignment)o.RuleA.GetValue() : OverlayAlignment.Middle;
 		Vector2 anchor = AlignmentToAnchor(align);
 
 		float max = 65535f;
@@ -198,15 +198,9 @@ public sealed class OverlayGUI {
 
 	private static Vector2 AlignmentToAnchor(OverlayAlignment a) {
 		return a switch {
-			OverlayAlignment.TopLeft => new Vector2(0f, 1f),
-			OverlayAlignment.TopMiddle => new Vector2(0.5f, 1f),
-			OverlayAlignment.TopRight => new Vector2(1f, 1f),
-			OverlayAlignment.MiddleLeft => new Vector2(0f, 0.5f),
-			OverlayAlignment.MiddleMiddle => new Vector2(0.5f, 0.5f),
-			OverlayAlignment.MiddleRight => new Vector2(1f, 0.5f),
-			OverlayAlignment.BottomLeft => new Vector2(0f, 0f),
-			OverlayAlignment.BottomMiddle => new Vector2(0.5f, 0f),
-			OverlayAlignment.BottomRight => new Vector2(1f, 0f),
+			OverlayAlignment.Left => new Vector2(0f, 0.5f),
+			OverlayAlignment.Middle => new Vector2(0.5f, 0.5f),
+			OverlayAlignment.Right => new Vector2(1f, 0.5f),
 			_ => new Vector2(0.5f, 0.5f),
 		};
 	}

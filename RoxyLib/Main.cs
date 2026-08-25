@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using UnityEngine;
 using UnityModManagerNet;
+
 using RoxyLib.Utils;
 
 namespace RoxyLib;
@@ -8,9 +9,11 @@ namespace RoxyLib;
 // RoxyLib 作为独立 UMM mod 的入口
 public static class Main {
 	public static void Setup(UnityModManager.ModEntry mod_entry) {
-		RoxyLib.Register(mod_entry);
+		RoxyLib.Initialize(mod_entry);
+		
 		mod_entry.OnUpdate = (entry, dt) => RoxyLib.Tick(dt);
 		mod_entry.OnGUI = entry => DrawOpenSettingsButton();
+
 		var harmony = new Harmony("RoxyLib.InputBlock");
 		harmony.PatchAll(typeof(Setting.InputBlockPatches).Assembly);
 	}

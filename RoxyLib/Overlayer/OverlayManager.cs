@@ -1,21 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using UnityEngine;
 using RoxyLib.Attribute;
 using RoxyLib.Setting;
+using RoxyLib.Utils;
 
 namespace RoxyLib.Overlay;
 
 public enum OverlayType {
-	LeftTop,
-	RightTop,
-	AnyPosition
+	LeftTop, RightTop, AnyPosition
 }
 
 public enum OverlayAlignment {
-	TopLeft,    TopMiddle,    TopRight,
-	MiddleLeft, MiddleMiddle, MiddleRight,
-	BottomLeft, BottomMiddle, BottomRight,
+	Left, Middle, Right,
 }
 
 public sealed class OverlayInfo {
@@ -30,9 +29,9 @@ public sealed class OverlayInfo {
 	// AnyPosition
 	public RuleInfo? RuleX { get; internal set; }   // X坐标
 	public RuleInfo? RuleY { get; internal set; }   // Y坐标
-	public RuleInfo? RuleA { get; internal set; }   // 对齐方式
 	public RuleInfo? RuleS { get; internal set; }   // 字体大小
-	public RuleInfo? RuleC { get; internal set; }   // 颜色
+	public RuleInfo? RuleA { get; internal set; }   // 对齐方式
+	public RuleInfo? RuleC { get; internal set; }   // 字体颜色
 
 	public event Action<OverlayInfo>? PositionChanged;
 
@@ -52,7 +51,7 @@ public sealed class OverlayInfo {
 }
 
 public static class OverlayManager {
-	private static readonly List<OverlayInfo> Overlays = [ ];
+	private static readonly Dictionary<string, List<OverlayInfo>> Overlays = [ ];
 
 	public static uint LeftCount { get; private set; }
 	public static uint RightCount { get; private set; }
@@ -62,8 +61,10 @@ public static class OverlayManager {
 		UpdateAll?.Invoke();
 	}
 
-	public static IReadOnlyList<OverlayInfo> GetOverlays() {
-		return Overlays.AsReadOnly();
+	public static IReadOnlyList<OverlayInfo> GetOverlays(string? mod_id = null) {
+		return (mod_id is null)
+			? Overlays.Values.SelectMany(list => list).ToList().AsReadOnly()
+			: Overlays.TryGetValue(mod_id, out var list) ? list.AsReadOnly() : Array.Empty<OverlayInfo>();
 	}
 
 	internal static void ScanAssembly(Assembly assembly) {
@@ -81,52 +82,81 @@ public static class OverlayManager {
 			}
 		}
 
-		foreach (RuleInfo rule in RuleManager.GetRules(RoxyLib.MOD_ID)) {
-			if (rule.Name is "LeftTopColor" or "RightTopColor")
-				rule.ValueChanged += (_, _) => NotifyUpdate();
-		}
-
 		NotifyUpdate();
 	}
 
 	public static void RemoveMod(string mod_id) {
-		Overlays.RemoveAll(o => o.ModId == mod_id);
+		Overlays.Remove(mod_id);
 		NotifyUpdate(); // 结构变化 → 通知全部重排
 	}
 
-	private static void Register(OverlayInfo info) {
+	internal static void Register(OverlayInfo info) {
+		string mod_id = info.ModId;
 		string name = info.Name;
-		foreach (RuleInfo rule in RuleManager.GetRules(info.ModId)) {
-			if (rule.Name == name + "_B")
-				info.RuleB = rule;
-		}
+		string desplay_en = LanguageManager.Translate($"Overlay.{info.ModId}.{name}", name, LanguageEnum.en_us);
+		string desplay_zh = LanguageManager.Translate($"Overlay.{info.ModId}.{name}", name, LanguageEnum.zh_cn);
 
+		var rule = new RuleInfo(mod_id, $"{name}.Switch", "Overlay", typeof(bool), false, null, null);
+		RuleManager.Register(rule);
+		LanguageManager.AddContent($"{mod_id}.Overlay.{name}.Switch",
+			$"{desplay_en} - Switch", $"{desplay_zh} - 开关", null, null
+		);
+		rule.ValueChanged += (_, _) => NotifyUpdate(); // 结构变化 → 通知全部重排
+		info.RuleB = rule;
+		
 		switch (info.OverlayType) {
 		case OverlayType.LeftTop:
 			info.Order = LeftCount++; break;
 		case OverlayType.RightTop:
 			info.Order = RightCount++; break;
 		case OverlayType.AnyPosition:
-			foreach (RuleInfo rule in RuleManager.GetRules(info.ModId)) {
-				if (rule.Name == name + "_X")
-					info.RuleX = rule;
-				else if (rule.Name == name + "_Y")
-					info.RuleY = rule;
-				else if (rule.Name == name + "_A")
-					info.RuleA = rule;
-				else if (rule.Name == name + "_S")
-					info.RuleS = rule;
-				else if (rule.Name == name + "_C")
-					info.RuleC = rule;
-			}
+			rule = new RuleInfo(mod_id, $"{name}.X", "Overlay", typeof(int), 0, 0, 65535);
+			RuleManager.Register(rule);
+			LanguageManager.AddContent($"{mod_id}.Overlay.{name}.X",
+				$"{desplay_en} - X", $"{desplay_zh} - X", null, null
+			);
+			rule.ValueChanged += (_, _) => info.NotifyChange();
+			info.RuleX = rule;
+
+			rule = new RuleInfo(mod_id, $"{name}.Y", "Overlay", typeof(int), 0, 0, 65535);
+			RuleManager.Register(rule);
+			LanguageManager.AddContent($"{mod_id}.Overlay.{name}.Y",
+				$"{desplay_en} - Y", $"{desplay_zh} - Y", null, null
+			);
+			rule.ValueChanged += (_, _) => info.NotifyChange();
+			info.RuleY = rule;
+
+			rule = new RuleInfo(mod_id, $"{name}.Size", "Overlay", typeof(uint), 10, 0, 65535);
+			RuleManager.Register(rule);
+			LanguageManager.AddContent($"{mod_id}.Overlay.{name}.Size",
+				$"{desplay_en} - Size", $"{desplay_zh} - 字体大小", null, null
+			);
+			rule.ValueChanged += (_, _) => info.NotifyChange();
+			info.RuleS = rule;
+
+			rule = new RuleInfo(mod_id, $"{name}.Alignment", "Overlay", typeof(OverlayAlignment), OverlayAlignment.Middle, null, null);
+			RuleManager.Register(rule);
+			LanguageManager.AddContent($"{mod_id}.Overlay.{name}.Alignment",
+				$"{desplay_en} - Alignment", $"{desplay_zh} - 对齐方式", null, null
+			);
+			rule.ValueChanged += (_, _) => info.NotifyChange();
+			info.RuleA = rule;
+
+			rule = new RuleInfo(mod_id, $"{name}.Color", "Overlay", typeof(Color), new Color(1, 1, 1, 1), null, null);
+			RuleManager.Register(rule);
+			LanguageManager.AddContent($"{mod_id}.Overlay.{name}.Color",
+				$"{desplay_en} - Color", $"{desplay_zh} - 字体颜色", null, null
+			);
+			rule.ValueChanged += (_, _) => info.NotifyChange();
+			info.RuleC = rule;
+
 			break;
 		}
 
-		foreach (RuleInfo? rule in new[] { info.RuleX, info.RuleY, info.RuleA, info.RuleS, info.RuleC }) {
-				rule?.ValueChanged += (_, _) => info.NotifyChange();
+		if (!Overlays.TryGetValue(mod_id, out var list)) {
+			list = [];
+			Overlays[mod_id] = list;
 		}
-		info.RuleB?.ValueChanged += (_, _) => NotifyUpdate(); // 结构变化 → 通知全部重排
-
-		Overlays.Add(info);
+		list.Add(info);
 	}
 }

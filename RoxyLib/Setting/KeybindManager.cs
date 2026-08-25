@@ -12,7 +12,7 @@ public static class KeybindManager {
 
 	public static void UpdateKeybindings() {
 		Keybinds.Clear();
-		foreach (var rule in RuleManager.GetRules(null))
+		foreach (var rule in RuleManager.GetRules())
 			if (rule.RuleType == RuleType.Switch && rule.Keybind is Keybind k)
 				Keybinds.Add(k);
 	}
@@ -23,6 +23,7 @@ public static class KeybindManager {
 	}
 }
 
+// 设置界面屏蔽输入
 [HarmonyPatch(typeof(RDInputType_Keyboard), "CheckKeyState")]
 internal static class InputBlockPatches {
 	static bool Prefix(ref bool __result) {

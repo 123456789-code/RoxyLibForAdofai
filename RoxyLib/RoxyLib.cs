@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using RoxyLib.Gui;
+using RoxyLib.Overlay;
+using RoxyLib.Setting;
+using RoxyLib.Utils;
 using UnityEngine;
 using UnityModManagerNet;
-using RoxyLib.Gui;
-using RoxyLib.Utils;
-using RoxyLib.Setting;
-using RoxyLib.Overlay;
 
 namespace RoxyLib;
 
@@ -15,10 +15,8 @@ namespace RoxyLib;
 /// </summary>
 public static class RoxyLib {
 	public const string MOD_ID = "RoxyLib";
-	public const string CONFIG_FILE = "config.json";
-	public const string LANG_DIR = "lang";
 
-	private static readonly List<ModHost> Hosts = [ ];
+	private static readonly List<ModHost> Hosts = [];
 	private static readonly RoxyGui Gui = new();
 	private static readonly OverlayGUI OverlayGUI = new();
 	private static float LastSaveTime; // 最后一次存储数据的时间
@@ -28,6 +26,15 @@ public static class RoxyLib {
 	public static event Action<ModHost>? ModRegistered;
 	public static event Action<string>? ModUnregistered;
 	public static event Action<long>? RevisionChanged;
+
+	internal static void Initialize(UnityModManager.ModEntry mod_entry) {
+		Register(mod_entry);
+		foreach (var rule in RuleManager.GetRules(MOD_ID))
+			if (rule.Name is "Language" or "OpenOverlay"
+				or "LeftTopSize" or "RightTopSize"
+				or "LeftTopColor" or "RightTopColor")
+				rule.ValueChanged += (_, _) => OverlayManager.NotifyUpdate();
+	}
 
 	public static void Register(UnityModManager.ModEntry mod_entry) {
 		mod_entry.OnToggle = ToggleHandler;
@@ -60,7 +67,7 @@ public static class RoxyLib {
 
 	public static void SaveAll() {
 		foreach (var host in Hosts) {
-			Storage.SaveAll(RuleManager.GetRules(host.ModId), host.ConfigPath);
+			Storage.SaveAll(RuleManager.GetRules(host.ModId), host.Path);
 		}
 		Dirty = false;
 	}
@@ -69,7 +76,7 @@ public static class RoxyLib {
 		Gui.OpenFromExternal();
 	}
 
-	public static IReadOnlyList<ModHost> GetHosts(){
+	public static IReadOnlyList<ModHost> GetHosts() {
 		return Hosts.AsReadOnly();
 	}
 
@@ -80,12 +87,12 @@ public static class RoxyLib {
 				return true;
 			Hosts.Add(host);
 
+			LanguageManager.LoadLangDir(host.Path);
 			RuleManager.ScanAssembly(mod_entry.Assembly);
 			OverlayManager.ScanAssembly(mod_entry.Assembly);
 			OverlayGUI.Initialize();
-			LanguageManager.LoadLangDir(host.LangDir);
 			IReadOnlyList<RuleInfo> rules = RuleManager.GetRules(host.ModId);
-			Storage.LoadAll(rules, host.ConfigPath);
+			Storage.LoadAll(rules, host.Path);
 			foreach (RuleInfo rule in rules) {
 				rule.ValueChanged += (sender, args) => Dirty = true;
 				if (rule.RuleType == RuleType.Switch) {

@@ -1,5 +1,4 @@
-﻿using System.IO;
-using System.Reflection;
+﻿using System.Reflection;
 using UnityModManagerNet;
 
 namespace RoxyLib.Utils;
@@ -9,8 +8,7 @@ namespace RoxyLib.Utils;
 /// </summary>
 public sealed class ModHost {
 	public string ModId { get; }
-	public string ConfigPath { get; }
-	public string LangDir { get; }
+	public string Path { get; }
 	public Assembly ModAssembly { get; }
 	public string DisplayName { get; }
 
@@ -18,7 +16,6 @@ public sealed class ModHost {
 		ModId = entry.Info.Id;
 		DisplayName = entry.Info.DisplayName ?? entry.Info.Id;
 		ModAssembly = entry.Assembly;
-		ConfigPath = Path.Combine(entry.Path, RoxyLib.CONFIG_FILE);
-		LangDir = Path.Combine(entry.Path, RoxyLib.LANG_DIR);
+		Path = entry.Path;
 	}
 }

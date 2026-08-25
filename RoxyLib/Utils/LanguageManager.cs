@@ -31,7 +31,8 @@ public static class LanguageManager {
 	/// <summary>
 	/// 加载指定目录下的所有 JSON 语言文件
 	/// </summary>
-	public static void LoadLangDir(string directory) {
+	public static void LoadLangDir(string path) {
+		string directory = Path.Combine(path, "lang");
 		if (!Directory.Exists(directory))
 			return;
 		foreach (string file in Directory.GetFiles(directory, "*.json")) {
@@ -55,26 +56,43 @@ public static class LanguageManager {
 		}
 	}
 
+	public static void AddContent(string key, string content, LanguageEnum lang) {
+		var dict = Dict[lang];
+		lock (dict)
+			dict[key] = content;
+	}
+
+	public static void AddContent(string key, string? en, string? zh, string? ja, string? ko) {
+		if (en is not null)
+			AddContent(key, en, LanguageEnum.en_us);
+		if (zh is not null)
+			AddContent(key, zh, LanguageEnum.zh_cn);
+		if (ja is not null)
+			AddContent(key, ja, LanguageEnum.ja_jp);
+		if (ko is not null)
+			AddContent(key, ko, LanguageEnum.ko_kr);
+	}
+
+	public static string Translate(string key, string fallback, LanguageEnum language) {
+		var table = Dict[language];
+		lock (table) {
+			table.TryGetValue(key, out string? value);
+			if (value is not null)
+				return value;
+		}
+		return fallback;
+	}
+
 	/// <summary>
 	/// 翻译指定键，若未找到则返回备用文本。
 	/// 回退链：当前语言 → "en-us" → 备用文本。
 	/// </summary>
 	public static string Translate(string key, string fallback) {
 		var lang = RoxyLibRules.Language;
-		var current_table = Dict[lang];
-		lock (current_table) {
-			current_table.TryGetValue(key, out string? value);
-			if (value is not null)
-				return value;
-		}
-		if (lang != LanguageEnum.en_us) {
-			var en_table = Dict[LanguageEnum.en_us];
-			lock (en_table) {
-				en_table.TryGetValue(key, out string? value);
-				if (value is not null)
-					return value;
-			}
-		}
+		if (Translate(key, fallback, lang) is string back)
+			return back;
+		if (lang != LanguageEnum.en_us && Translate(key, fallback, LanguageEnum.en_us) is string en)
+			return en;
 		return fallback;
 	}
 

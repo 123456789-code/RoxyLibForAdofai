@@ -9,5 +9,7 @@
 	"RoxyExample.Visual.ShowStats": "Show Stats",
 	"RoxyExample.Visual.ShowStats.Desc": "Show in-game statistics.",
 	"RoxyExample.Input.MaxCombo": "Max Combo",
-	"RoxyExample.Input.MaxCombo.Desc": "Upper bound of the combo counter."
+	"RoxyExample.Input.MaxCombo.Desc": "Upper bound of the combo counter.",
+	"Overlay.RoxyExample.Overlay1": "Overlay1",
+	"Overlay.RoxyExample.TimeOverlay": "Time"
 }

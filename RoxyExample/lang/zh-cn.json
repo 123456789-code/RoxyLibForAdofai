@@ -9,5 +9,7 @@
 	"RoxyExample.Visual.ShowStats": "显示统计",
 	"RoxyExample.Visual.ShowStats.Desc": "在游戏内显示统计数据",
 	"RoxyExample.Input.MaxCombo": "连击上限",
-	"RoxyExample.Input.MaxCombo.Desc": "连击计数器的上限"
+	"RoxyExample.Input.MaxCombo.Desc": "连击计数器的上限",
+	"Overlay.RoxyExample.Overlay1": "显示1",
+	"Overlay.RoxyExample.TimeOverlay": "时间"
 }

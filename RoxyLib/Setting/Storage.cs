@@ -12,7 +12,8 @@ public static class Storage {
 	/// 读取配置并回填规则与快捷键
 	/// 文件不存在则用默认值落盘
 	/// </summary>
-	public static void LoadAll(IReadOnlyList<RuleInfo> rules, string config_path) {
+	public static void LoadAll(IReadOnlyList<RuleInfo> rules, string path) {
+		string config_path = Path.Combine(path, "config.json");
 		EnsureDirectory(config_path);
 		if (!File.Exists(config_path)) {
 			SaveAll(rules, config_path);
@@ -42,9 +43,10 @@ public static class Storage {
 	/// <summary>
 	/// 保存规则与快捷键到 config.json
 	/// </summary>
-	public static void SaveAll(IReadOnlyList<RuleInfo> rules, string config_path) {
+	public static void SaveAll(IReadOnlyList<RuleInfo> rules, string path) {
 		if (rules.Count == 0)
 			return;
+		string config_path = Path.Combine(path, "config.json");
 		EnsureDirectory(config_path);
 
 		// 填充内容
