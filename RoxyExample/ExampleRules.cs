@@ -1,4 +1,4 @@
-﻿using RoxyLib.Rules;
+﻿using RoxyLib.Attribute;
 
 namespace RoxyExample;
 

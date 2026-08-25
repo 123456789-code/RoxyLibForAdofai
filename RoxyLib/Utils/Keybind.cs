@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using HarmonyLib;
-using RoxyLib.Rules;
 using UnityEngine;
 
-namespace RoxyLib.Input;
+namespace RoxyLib.Utils;
 
 /// <summary>
 /// 表示一个按键组合，由多个 <see cref="KeyCode"/> 组成（如 Ctrl+Shift+A）
@@ -37,7 +34,7 @@ public readonly struct KeyCombination {
 /// <summary>
 /// 单个按键绑定，包含所属 Mod、名称、当前组合，并提供状态查询和事件
 /// </summary>
-public sealed class RoxyKeybind {
+public sealed class Keybind {
 	public KeyCombination Combination { get; set {
 		field = value;
 		WasDown = IsDown();
@@ -45,13 +42,12 @@ public sealed class RoxyKeybind {
 	private bool WasDown { get; set; }
 	public event Action? Activated;
 
-	public RoxyKeybind(KeyCombination combination) {
+	public Keybind(KeyCombination combination) {
 		Combination = combination;
 	}
 
 	/// <summary>
-	/// 内部轮询：检测边缘触发并调用 <see cref="Activated"/> 事件
-	/// 由 <see cref="RoxyInput.Update"/> 每帧调用
+	/// 内部轮询
 	/// </summary>
 	internal void Poll() {
 		bool is_down = IsDown();
@@ -65,35 +61,5 @@ public sealed class RoxyKeybind {
 	public bool IsDown() {
 		KeyCode[] keys = Combination.Keys;
 		return !(keys is null || keys.Length == 0) && keys.All(UnityEngine.Input.GetKey);
-	}
-}
-
-/// <summary>
-/// 按键绑定管理器
-/// </summary>
-public static class RoxyInput {
-	private readonly static List<RoxyKeybind> Keybinds = [];
-
-	public static void UpdateKeybindings() {
-		Keybinds.Clear();
-		foreach (var rule in RoxyRules.GetRules(null))
-			if (rule.RuleType == RoxyRuleType.Switch && rule.Keybind is RoxyKeybind k)
-				Keybinds.Add(k);
-	}
-
-	public static void Update(float dt) {
-		foreach (var keybind in Keybinds)
-			keybind.Poll();
-	}
-}
-
-[HarmonyPatch(typeof(RDInputType_Keyboard), "CheckKeyState")]
-internal static class InputBlockPatches {
-	static bool Prefix(ref bool __result) {
-		if (RoxyLibRules.OpenSettings) {
-			__result = false; // 游戏以为这个键没按
-			return false;     // 跳过原方法
-		}
-		return true;
 	}
 }

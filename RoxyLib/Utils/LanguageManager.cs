@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json.Linq;
 
-namespace RoxyLib.Lang;
+namespace RoxyLib.Utils;
 
 /// <summary>
 /// 支持的语言种类，包含中文、英文、日文、韩文
@@ -20,7 +20,7 @@ public enum LanguageEnum {
 /// 当前语言直接派生自 RoxyLibRules.Language 静态规则
 /// 切换语言 = 对该规则调用 SetValue（触发 ValueChanged → RaiseLanguageChanged）
 /// </summary>
-public static class RoxyLang {
+public static class LanguageManager {
 	private static readonly ConcurrentDictionary<LanguageEnum, Dictionary<string, string>> Dict = new() {
 		[LanguageEnum.en_us] = new(),
 		[LanguageEnum.zh_cn] = new(),

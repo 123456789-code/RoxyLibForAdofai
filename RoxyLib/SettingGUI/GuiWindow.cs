@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using RoxyLib.Input;
-using RoxyLib.Lang;
-using RoxyLib.Rules;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using RoxyLib.Utils;
+using RoxyLib.Setting;
 
 namespace RoxyLib.Gui;
 
@@ -62,7 +61,7 @@ public sealed class RoxyGui {
 	}
 
 	/// <summary>某 mod 注册完成：若为 RoxyLib 自身，订阅其 OpenSettings（开关窗口）与 Language（切语言刷新）。</summary>
-	private void OnModRegistered(RoxyHost host) {
+	private void OnModRegistered(ModHost host) {
 		if (host.ModId == RoxyLib.MOD_ID) {
 			SubscribeOpenSettings();
 			SubscribeLanguage();
@@ -87,7 +86,7 @@ public sealed class RoxyGui {
 	// ---------------- 开关 / 语言驱动 ----------------
 
 	private void SubscribeOpenSettings() {
-		foreach (RuleInfo rule in RoxyRules.GetRules(RoxyLib.MOD_ID)) {
+		foreach (RuleInfo rule in RuleManager.GetRules(RoxyLib.MOD_ID)) {
 			if (rule.Name == "OpenSettings") {
 				rule.ValueChanged += (sender, args) => SetOpen((bool)args);
 				SetOpen((bool)rule.GetValue());
@@ -98,7 +97,7 @@ public sealed class RoxyGui {
 
 	/// <summary>订阅 Language 规则：值变更 → 标记刷新（重读翻译）。</summary>
 	private void SubscribeLanguage() {
-		foreach (RuleInfo rule in RoxyRules.GetRules(RoxyLib.MOD_ID)) {
+		foreach (RuleInfo rule in RuleManager.GetRules(RoxyLib.MOD_ID)) {
 			if (rule.Name == "Language") {
 				rule.ValueChanged += (sender, args) => Dirty = true;
 				break;
@@ -107,7 +106,7 @@ public sealed class RoxyGui {
 	}
 
 	private void SetOpenSettingsValue(bool value) {
-		foreach (RuleInfo rule in RoxyRules.GetRules(RoxyLib.MOD_ID)) {
+		foreach (RuleInfo rule in RuleManager.GetRules(RoxyLib.MOD_ID)) {
 			if (rule.Name == "OpenSettings") {
 				rule.SetValue(value, true);
 				return;
@@ -314,7 +313,7 @@ public sealed class RoxyGui {
 	}
 
 	private string T(string key, string fallback) {
-		return RoxyLang.Translate(key, fallback);
+		return LanguageManager.Translate(key, fallback);
 	}
 
 	// ---------------- 左栏 ----------------
@@ -325,7 +324,7 @@ public sealed class RoxyGui {
 			return;
 		}
 		Clear(ModListContent);
-		List<RoxyHost> hosts = RoxyLib.GetHosts().ToList();
+		List<ModHost> hosts = RoxyLib.GetHosts().ToList();
 		hosts.Sort((a, b) => {
 			bool a_self = a.ModId == RoxyLib.MOD_ID;
 			bool b_self = b.ModId == RoxyLib.MOD_ID;
@@ -335,7 +334,7 @@ public sealed class RoxyGui {
 			return string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase);
 		});
 		float y = 4;
-		foreach (RoxyHost host in hosts) {
+		foreach (ModHost host in hosts) {
 			if (SearchText.Length > 0 && host.DisplayName.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) < 0) {
 				continue;
 			}
@@ -348,7 +347,7 @@ public sealed class RoxyGui {
 	}
 
 	/// <summary>添加一个 mod 卡片行（选中高亮 + 左侧 Accent 条 + 加粗文字）。</summary>
-	private float AddModEntry(RoxyHost host, float y) {
+	private float AddModEntry(ModHost host, float y) {
 		float height = UiFactory.Theme.RowHeight - 4;
 		bool selected = host.ModId == SelectedModId;
 		RectTransform row = UiFactory.CreateRoundedPanel("Mod_" + host.ModId, ModListContent!, selected ? UiFactory.Theme.AccentDim : UiFactory.Theme.PanelLight);
@@ -397,7 +396,7 @@ public sealed class RoxyGui {
 			dropdown.Close();
 		}
 		Dropdowns.Clear();
-		RoxyHost? host = RoxyLib.GetHosts().FirstOrDefault(candidate => candidate.ModId == SelectedModId);
+		ModHost? host = RoxyLib.GetHosts().FirstOrDefault(candidate => candidate.ModId == SelectedModId);
 		if (host == null) {
 			AddEmptyHint(6);
 			return;
@@ -405,7 +404,7 @@ public sealed class RoxyGui {
 		if (RightTitle != null) {
 			RightTitle.text = host.DisplayName;
 		}
-		List<RuleInfo> rules = RoxyRules.GetRules(SelectedModId).ToList();
+		List<RuleInfo> rules = RuleManager.GetRules(SelectedModId).ToList();
 		List<RuleInfo> filtered = rules.Where(rule => SearchText.Length == 0 || MatchesSearch(rule)).ToList();
 		if (filtered.Count == 0) {
 			AddEmptyHint(6);
@@ -458,7 +457,7 @@ public sealed class RoxyGui {
 
 	/// <summary>规则卡片行：名称标签（可翻译）+ 中部控件区 + 右侧重置按钮。</summary>
 	private float AddRuleRow(RuleInfo rule, float y) {
-		float height = rule.RuleType == RoxyRuleType.Color ? 152 : UiFactory.Theme.RowHeight;
+		float height = rule.RuleType == RuleType.Color ? 152 : UiFactory.Theme.RowHeight;
 		RectTransform row = UiFactory.CreateRoundedPanel("Rule_" + rule.Name, RuleContent!, UiFactory.Theme.PanelLight);
 		UiFactory.PlaceRow(row, RuleContent!, y, height);
 		row.offsetMin = new Vector2(6, row.offsetMin.y);
@@ -474,12 +473,12 @@ public sealed class RoxyGui {
 		control.offsetMax = new Vector2(-44, 0);
 
 		switch (rule.RuleType) {
-		case RoxyRuleType.Switch: BuildSwitchControl(rule, control); break;
-		case RoxyRuleType.SliderInt: BuildNumericControl(rule, control, true); break;
-		case RoxyRuleType.SliderFloat: BuildNumericControl(rule, control, false); break;
-		case RoxyRuleType.Options: BuildOptionsControl(rule, control); break;
-		case RoxyRuleType.Color: BuildColorControl(rule, control); break;
-		case RoxyRuleType.String: BuildStringControl(rule, control); break;
+		case RuleType.Switch: BuildSwitchControl(rule, control); break;
+		case RuleType.SliderInt: BuildNumericControl(rule, control, true); break;
+		case RuleType.SliderFloat: BuildNumericControl(rule, control, false); break;
+		case RuleType.Options: BuildOptionsControl(rule, control); break;
+		case RuleType.Color: BuildColorControl(rule, control); break;
+		case RuleType.String: BuildStringControl(rule, control); break;
 		}
 
 		Button reset = UiFactory.CreateButton("Reset", row, "↺", () => { rule.SetValue(rule.DefaultValue, true); BuildRulePanel(); }, 28, 28);
@@ -501,7 +500,7 @@ public sealed class RoxyGui {
 		UiFactory.Stretch(toggle.GetComponent<RectTransform>());
 
 		if (rule.Keybind != null) {
-			RoxyKeybind keybind = rule.Keybind;
+			Keybind keybind = rule.Keybind;
 			Button key_btn = null!;
 			key_btn = UiFactory.CreateButton("Keybind", holder, keybind.Combination.ToString(), () => {
 				CapturingKeybind = true;

@@ -3,20 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using RoxyLib.Input;
-using RoxyLib.Rules;
+using RoxyLib.Utils;
 
-namespace RoxyLib.Storage;
+namespace RoxyLib.Setting;
 
-/// <summary>
-/// 结构：
-/// {
-///   "ModId": "RoxyExample",
-///   "Rules": { "Gameplay.Speed": "1.25", ... },
-///   "Keybinds": { "Input.OpenMenu": "Ctrl+F11", ... },
-/// }
-/// </summary>
-public static class RoxyStorage {
+public static class Storage {
 	/// <summary>
 	/// 读取配置并回填规则与快捷键
 	/// 文件不存在则用默认值落盘
@@ -35,9 +26,9 @@ public static class RoxyStorage {
 					if (rules_read[name] is JToken rule_token)
 						rule.LoadFromString(rule_token.Value<string>()
 							?? throw new ArgumentNullException(nameof(rule_token), "数据不能为空"));
-					if (rule.RuleType == RoxyRuleType.Switch
+					if (rule.RuleType == RuleType.Switch
 						&& keybinds_read[name] is JToken key_token)
-						rule.Keybind = new RoxyKeybind(
+						rule.Keybind = new Keybind(
 							KeyCombination.Parse(key_token.Value<string>()
 								?? throw new ArgumentNullException(nameof(key_token), "数据不能为空"))
 						);
@@ -63,8 +54,8 @@ public static class RoxyStorage {
 		foreach (var rule in rules) {
 			string name = $"{rule.Category}.{rule.Name}";
 			rules_save[name] = rule.GetValueString();
-			if (rule.RuleType == RoxyRuleType.Switch
-				&& rule.Keybind is RoxyKeybind k)
+			if (rule.RuleType == RuleType.Switch
+				&& rule.Keybind is Keybind k)
 				keybinds_save[name] = k.Combination.ToString();
 		}
 		root["Rules"] = rules_save;
