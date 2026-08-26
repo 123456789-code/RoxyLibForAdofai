@@ -129,7 +129,7 @@ public sealed class OverlayGUI {
 			return GetRoxyLibColor("RightTopColor");
 		if (o.RuleC != null)
 			return (Color)o.RuleC.GetValue();
-		return UiFactory.Theme.Text;
+		return UiFactory.Text;
 	}
 
 	/// <summary>取 RoxyLib 自身（ModId="RoxyLib"）的某条颜色规则值。</summary>

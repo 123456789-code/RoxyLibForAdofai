@@ -5,9 +5,8 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using RoxyLib.Utils;
-using RoxyLib.Setting;
 
-namespace RoxyLib.Gui;
+namespace RoxyLib.Setting;
 
 /// <summary>
 /// RLA 设置主窗口。
@@ -154,11 +153,11 @@ public sealed class RoxyGui {
 
 		// 窗口阴影（比窗口大一圈、略向下偏移，先创建 → 在窗口下层）
 		WindowShadow = UiFactory.CreateRoundedPanel("WindowShadow", Root, new Color(0f, 0f, 0f, 0.55f));
-		UiFactory.SetRect(WindowShadow, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -8), new Vector2(UiFactory.Theme.WindowWidth + 18, UiFactory.Theme.WindowHeight + 18));
+		UiFactory.SetRect(WindowShadow, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -8), new Vector2(UiFactory.WindowWidth + 18, UiFactory.WindowHeight + 18));
 
 		// 主窗口：居中固定尺寸，圆角背景
-		Window = UiFactory.CreateRoundedPanel("RoxyWindow", Root, UiFactory.Theme.Background);
-		UiFactory.SetRect(Window, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(UiFactory.Theme.WindowWidth, UiFactory.Theme.WindowHeight));
+		Window = UiFactory.CreateRoundedPanel("RoxyWindow", Root, UiFactory.Background);
+		UiFactory.SetRect(Window, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(UiFactory.WindowWidth, UiFactory.WindowHeight));
 		BuildTopBar(Window);
 		BuildBody(Window);
 		Window.gameObject.SetActive(false);
@@ -181,18 +180,18 @@ public sealed class RoxyGui {
 		bar.anchorMax = new Vector2(1, 1);
 		bar.pivot = new Vector2(0.5f, 1);
 		bar.anchoredPosition = Vector2.zero;
-		bar.sizeDelta = new Vector2(0, UiFactory.Theme.TopBarHeight);
+		bar.sizeDelta = new Vector2(0, UiFactory.TopBarHeight);
 
 		// 标题（大号、亮白、带小 Accent 竖条装饰）
-		RectTransform title_deco = UiFactory.CreatePanel("TitleDeco", bar, UiFactory.Theme.Accent);
+		RectTransform title_deco = UiFactory.CreatePanel("TitleDeco", bar, UiFactory.Accent);
 		title_deco.anchorMin = new Vector2(0, 0.5f);
 		title_deco.anchorMax = new Vector2(0, 0.5f);
 		title_deco.pivot = new Vector2(0.5f, 0.5f);
 		title_deco.anchoredPosition = new Vector2(22, 0);
 		title_deco.sizeDelta = new Vector2(4, 22);
 
-		TopTitle = UiFactory.CreateText("Title", bar, T("RoxyLib.Window.Title", "RoxyLib Settings"), UiFactory.Theme.FontSizeTitle, UiFactory.Theme.Text, TextAnchor.MiddleLeft);
-		TopTitle.rectTransform.SetRectAt(36, 0, 280, UiFactory.Theme.TopBarHeight);
+		TopTitle = UiFactory.CreateText("Title", bar, T("RoxyLib.Window.Title", "RoxyLib Settings"), UiFactory.FontSizeTitle, UiFactory.Text, TextAnchor.MiddleLeft);
+		TopTitle.rectTransform.SetRectAt(36, 0, 280, UiFactory.TopBarHeight);
 
 		// 搜索框
 		RectTransform search_holder = UiFactory.CreateRect("SearchHolder", bar);
@@ -212,11 +211,11 @@ public sealed class RoxyGui {
 		UiFactory.Stretch(close.GetComponent<RectTransform>());
 
 		// 顶栏底部强调线
-		RectTransform divider = UiFactory.CreatePanel("Divider", window, new Color(UiFactory.Theme.Accent.r, UiFactory.Theme.Accent.g, UiFactory.Theme.Accent.b, 0.5f));
+		RectTransform divider = UiFactory.CreatePanel("Divider", window, new Color(UiFactory.Accent.r, UiFactory.Accent.g, UiFactory.Accent.b, 0.5f));
 		divider.anchorMin = new Vector2(0, 1);
 		divider.anchorMax = new Vector2(1, 1);
 		divider.pivot = new Vector2(0.5f, 1);
-		divider.anchoredPosition = new Vector2(0, -UiFactory.Theme.TopBarHeight);
+		divider.anchoredPosition = new Vector2(0, -UiFactory.TopBarHeight);
 		divider.sizeDelta = new Vector2(0, 1);
 	}
 
@@ -226,15 +225,15 @@ public sealed class RoxyGui {
 		body.anchorMin = Vector2.zero;
 		body.anchorMax = Vector2.one;
 		body.offsetMin = new Vector2(12, 12);
-		body.offsetMax = new Vector2(-12, -(UiFactory.Theme.TopBarHeight + 1));
+		body.offsetMax = new Vector2(-12, -(UiFactory.TopBarHeight + 1));
 
 		// ---- 左栏：圆角卡片 ----
-		RectTransform left = UiFactory.CreateRoundedPanel("Left", body, UiFactory.Theme.Panel);
+		RectTransform left = UiFactory.CreateRoundedPanel("Left", body, UiFactory.Panel);
 		left.anchorMin = new Vector2(0, 0);
 		left.anchorMax = new Vector2(0, 1);
 		left.pivot = new Vector2(0, 0.5f);
 		left.anchoredPosition = Vector2.zero;
-		left.sizeDelta = new Vector2(UiFactory.Theme.ModListWidth, 0);
+		left.sizeDelta = new Vector2(UiFactory.ModListWidth, 0);
 
 		BuildColumnHeader(left, "LeftHeader", out LeftTitle, T("RoxyLib.Left.Title", "MODS"));
 		RectTransform left_body = UiFactory.CreateRect("LeftBody", left);
@@ -242,13 +241,13 @@ public sealed class RoxyGui {
 		left_body.anchorMax = Vector2.one;
 		left_body.offsetMin = new Vector2(6, 6);
 		left_body.offsetMax = new Vector2(0, -40);
-		(_, ModListContent) = UiFactory.CreateScrollView("Scroll", left_body, UiFactory.Theme.Panel);
+		(_, ModListContent) = UiFactory.CreateScrollView("Scroll", left_body, UiFactory.Panel);
 
 		// ---- 右栏：圆角卡片 ----
-		RectTransform right = UiFactory.CreateRoundedPanel("Right", body, new Color(UiFactory.Theme.Background.r, UiFactory.Theme.Background.g, UiFactory.Theme.Background.b, 1f));
+		RectTransform right = UiFactory.CreateRoundedPanel("Right", body, new Color(UiFactory.Background.r, UiFactory.Background.g, UiFactory.Background.b, 1f));
 		right.anchorMin = Vector2.zero;
 		right.anchorMax = Vector2.one;
-		right.offsetMin = new Vector2(UiFactory.Theme.ModListWidth + 12, 0);
+		right.offsetMin = new Vector2(UiFactory.ModListWidth + 12, 0);
 		right.offsetMax = Vector2.zero;
 
 		BuildColumnHeader(right, "RightHeader", out RightTitle, "");
@@ -257,7 +256,7 @@ public sealed class RoxyGui {
 		right_body.anchorMax = Vector2.one;
 		right_body.offsetMin = new Vector2(8, 8);
 		right_body.offsetMax = new Vector2(0, -40);
-		(_, RuleContent) = UiFactory.CreateScrollView("Scroll", right_body, new Color(UiFactory.Theme.Background.r, UiFactory.Theme.Background.g, UiFactory.Theme.Background.b, 1f));
+		(_, RuleContent) = UiFactory.CreateScrollView("Scroll", right_body, new Color(UiFactory.Background.r, UiFactory.Background.g, UiFactory.Background.b, 1f));
 	}
 
 	/// <summary>构建卡片顶部的栏目标题（小号 Accent 文字 + 底部细分隔线）。</summary>
@@ -269,7 +268,7 @@ public sealed class RoxyGui {
 		header.anchoredPosition = new Vector2(0, 0);
 		header.sizeDelta = new Vector2(0, 36);
 
-		title = UiFactory.CreateText("Title", header, text, UiFactory.Theme.FontSizeSmall, UiFactory.Theme.Accent, TextAnchor.MiddleLeft);
+		title = UiFactory.CreateText("Title", header, text, UiFactory.FontSizeSmall, UiFactory.Accent, TextAnchor.MiddleLeft);
 		UiFactory.Stretch(title.rectTransform);
 		title.rectTransform.offsetMin = new Vector2(14, 0);
 		title.rectTransform.offsetMax = new Vector2(-14, -2);
@@ -348,9 +347,9 @@ public sealed class RoxyGui {
 
 	/// <summary>添加一个 mod 卡片行（选中高亮 + 左侧 Accent 条 + 加粗文字）。</summary>
 	private float AddModEntry(ModHost host, float y) {
-		float height = UiFactory.Theme.RowHeight - 4;
+		float height = UiFactory.RowHeight - 4;
 		bool selected = host.ModId == SelectedModId;
-		RectTransform row = UiFactory.CreateRoundedPanel("Mod_" + host.ModId, ModListContent!, selected ? UiFactory.Theme.AccentDim : UiFactory.Theme.PanelLight);
+		RectTransform row = UiFactory.CreateRoundedPanel("Mod_" + host.ModId, ModListContent!, selected ? UiFactory.AccentDim : UiFactory.PanelLight);
 		UiFactory.PlaceRow(row, ModListContent!, y, height);
 		// 只缩左右，保留 PlaceRow 用 sizeDelta 算好的高度（offset 的 y 会覆盖高度，不能置 0）
 		row.offsetMin = new Vector2(6, row.offsetMin.y);
@@ -361,7 +360,7 @@ public sealed class RoxyGui {
 
 		// 选中时左侧 Accent 条
 		if (selected) {
-			RectTransform bar = UiFactory.CreatePanel("SelectedBar", row, UiFactory.Theme.Accent);
+			RectTransform bar = UiFactory.CreatePanel("SelectedBar", row, UiFactory.Accent);
 			bar.anchorMin = new Vector2(0, 0.18f);
 			bar.anchorMax = new Vector2(0, 0.82f);
 			bar.pivot = new Vector2(0, 0.5f);
@@ -369,7 +368,7 @@ public sealed class RoxyGui {
 			bar.sizeDelta = new Vector2(3, 0);
 		}
 
-		Text label = UiFactory.CreateText("Label", row, host.DisplayName, UiFactory.Theme.FontSize, selected ? UiFactory.Theme.Text : UiFactory.Theme.TextDim);
+		Text label = UiFactory.CreateText("Label", row, host.DisplayName, UiFactory.FontSize, selected ? UiFactory.Text : UiFactory.TextDim);
 		UiFactory.Stretch(label.rectTransform);
 		label.rectTransform.offsetMin = new Vector2(12, 0);
 		label.rectTransform.offsetMax = new Vector2(-8, 0);
@@ -436,18 +435,18 @@ public sealed class RoxyGui {
 	}
 
 	private void AddEmptyHint(float y) {
-		Text hint = UiFactory.CreateText("Empty", RuleContent!, T("RoxyLib.Rule.Empty", "No rules"), UiFactory.Theme.FontSize, UiFactory.Theme.TextDim, TextAnchor.MiddleCenter);
+		Text hint = UiFactory.CreateText("Empty", RuleContent!, T("RoxyLib.Rule.Empty", "No rules"), UiFactory.FontSize, UiFactory.TextDim, TextAnchor.MiddleCenter);
 		UiFactory.PlaceRow(hint.rectTransform, RuleContent!, y, 40);
 	}
 
 	/// <summary>分类标题：Accent 小字胶囊，圆角浅底。</summary>
 	private float AddSectionHeader(string category, float y) {
-		float height = UiFactory.Theme.SectionHeight;
+		float height = UiFactory.SectionHeight;
 		RectTransform row = UiFactory.CreateRoundedPanel("Section_" + category, RuleContent!, new Color(1f, 1f, 1f, 0.045f));
 		UiFactory.PlaceRow(row, RuleContent!, y, height);
 		row.offsetMin = new Vector2(6, row.offsetMin.y);
 		row.offsetMax = new Vector2(-6, row.offsetMax.y);
-		Text label = UiFactory.CreateText("Label", row, T($"{SelectedModId}.Category.{category}", category), UiFactory.Theme.FontSizeSmall, UiFactory.Theme.Accent, TextAnchor.MiddleLeft);
+		Text label = UiFactory.CreateText("Label", row, T($"{SelectedModId}.Category.{category}", category), UiFactory.FontSizeSmall, UiFactory.Accent, TextAnchor.MiddleLeft);
 		UiFactory.Stretch(label.rectTransform);
 		label.rectTransform.offsetMin = new Vector2(14, 0);
 		return height;
@@ -457,13 +456,13 @@ public sealed class RoxyGui {
 
 	/// <summary>规则卡片行：名称标签（可翻译）+ 中部控件区 + 右侧重置按钮。</summary>
 	private float AddRuleRow(RuleInfo rule, float y) {
-		float height = rule.RuleType == RuleType.Color ? 152 : UiFactory.Theme.RowHeight;
-		RectTransform row = UiFactory.CreateRoundedPanel("Rule_" + rule.Name, RuleContent!, UiFactory.Theme.PanelLight);
+		float height = rule.RuleType == RuleType.Color ? 152 : UiFactory.RowHeight;
+		RectTransform row = UiFactory.CreateRoundedPanel("Rule_" + rule.Name, RuleContent!, UiFactory.PanelLight);
 		UiFactory.PlaceRow(row, RuleContent!, y, height);
 		row.offsetMin = new Vector2(6, row.offsetMin.y);
 		row.offsetMax = new Vector2(-6, row.offsetMax.y);
 
-		Text label = UiFactory.CreateText("Label", row, T($"{SelectedModId}.{rule.Category}.{rule.Name}", rule.Name), UiFactory.Theme.FontSize, UiFactory.Theme.Text);
+		Text label = UiFactory.CreateText("Label", row, T($"{SelectedModId}.{rule.Category}.{rule.Name}", rule.Name), UiFactory.FontSize, UiFactory.Text);
 		UiFactory.SetRect(label.rectTransform, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(18, 0), new Vector2(190, height));
 
 		RectTransform control = UiFactory.CreateRect("Control", row);
@@ -605,7 +604,7 @@ public sealed class RoxyGui {
 			row.sizeDelta = new Vector2(0, row_h);
 
 			// 左侧标签
-			UiFactory.CreateText("Name", row, names[i], UiFactory.Theme.FontSizeSmall, UiFactory.Theme.TextDim, TextAnchor.MiddleLeft)
+			UiFactory.CreateText("Name", row, names[i], UiFactory.FontSizeSmall, UiFactory.TextDim, TextAnchor.MiddleLeft)
 				.rectTransform.SetRectAt(0, 0, label_w, row_h);
 
 			// 右侧输入框（右对齐，始终在控件区内 → 不再被重置按钮遮住）
