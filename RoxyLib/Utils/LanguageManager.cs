@@ -43,9 +43,8 @@ public static class LanguageManager {
 				lock (dict) {
 					foreach (var pair in root) {
 						var token = pair.Value;
-						if (token is null || token.Type != JTokenType.String) {
+						if (token is null || token.Type != JTokenType.String)
 							throw new InvalidDataException($"Value for key '{pair.Key}' must be a string, but found type {token?.Type}");
-						}
 						dict[pair.Key] = token.Value<string>() ?? string.Empty;
 					}
 				}
@@ -76,8 +75,7 @@ public static class LanguageManager {
 	public static string Translate(string key, string fallback, LanguageEnum language) {
 		var table = Dict[language];
 		lock (table) {
-			table.TryGetValue(key, out string? value);
-			if (value is not null)
+			if (table.TryGetValue(key, out string? value))
 				return value;
 		}
 		return fallback;

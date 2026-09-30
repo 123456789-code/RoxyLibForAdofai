@@ -24,10 +24,13 @@ public static class Storage {
 			if (root["Rules"] is JObject rules_read && root["Keybinds"] is JObject keybinds_read)
 				foreach (var rule in rules) {
 					string name = $"{rule.Category}.{rule.Name}";
-					if (rules_read[name] is JToken rule_token)
-						rule.LoadFromString(rule_token.Value<string>()
-							?? throw new ArgumentNullException(nameof(rule_token), "数据不能为空"));
-					if (rule.RuleType == RuleType.Switch
+					if (rules_read[name] is JToken rule_token) {
+						string raw = rule_token.Value<string>()
+							?? throw new ArgumentNullException(nameof(rule_token), "数据不能为空");
+						if (!rule.TryDeserialize(raw))
+							UnityEngine.Debug.LogWarning($"[RoxyLib] deserialize failed for '{name}' value '{raw}'");
+					}
+					if (rule is SwitchRule
 						&& keybinds_read[name] is JToken key_token)
 						rule.Keybind = new Keybind(
 							KeyCombination.Parse(key_token.Value<string>()
@@ -55,8 +58,8 @@ public static class Storage {
 		var keybinds_save = new JObject();
 		foreach (var rule in rules) {
 			string name = $"{rule.Category}.{rule.Name}";
-			rules_save[name] = rule.GetValueString();
-			if (rule.RuleType == RuleType.Switch
+			rules_save[name] = rule.Serialize();
+			if (rule is SwitchRule
 				&& rule.Keybind is Keybind k)
 				keybinds_save[name] = k.Combination.ToString();
 		}

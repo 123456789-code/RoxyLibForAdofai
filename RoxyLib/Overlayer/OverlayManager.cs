@@ -96,7 +96,7 @@ public static class OverlayManager {
 		string desplay_en = LanguageManager.Translate($"Overlay.{info.ModId}.{name}", name, LanguageEnum.en_us);
 		string desplay_zh = LanguageManager.Translate($"Overlay.{info.ModId}.{name}", name, LanguageEnum.zh_cn);
 
-		var rule = new RuleInfo(mod_id, $"{name}.Switch", "Overlay", typeof(bool), false, null, null);
+		var rule = RuleFactory.Create(mod_id, $"{name}.Switch", "Overlay", typeof(bool), false, null, null);
 		RuleManager.Register(rule);
 		LanguageManager.AddContent($"{mod_id}.Overlay.{name}.Switch",
 			$"{desplay_en} - Switch", $"{desplay_zh} - 开关", null, null
@@ -110,7 +110,7 @@ public static class OverlayManager {
 		case OverlayType.RightTop:
 			info.Order = RightCount++; break;
 		case OverlayType.AnyPosition:
-			rule = new RuleInfo(mod_id, $"{name}.X", "Overlay", typeof(int), 0, 0, 65535);
+			rule = RuleFactory.Create(mod_id, $"{name}.X", "Overlay", typeof(int), 0, 0, 65535);
 			RuleManager.Register(rule);
 			LanguageManager.AddContent($"{mod_id}.Overlay.{name}.X",
 				$"{desplay_en} - X", $"{desplay_zh} - X", null, null
@@ -118,7 +118,7 @@ public static class OverlayManager {
 			rule.ValueChanged += (_, _) => info.NotifyChange();
 			info.RuleX = rule;
 
-			rule = new RuleInfo(mod_id, $"{name}.Y", "Overlay", typeof(int), 0, 0, 65535);
+			rule = RuleFactory.Create(mod_id, $"{name}.Y", "Overlay", typeof(int), 0, 0, 65535);
 			RuleManager.Register(rule);
 			LanguageManager.AddContent($"{mod_id}.Overlay.{name}.Y",
 				$"{desplay_en} - Y", $"{desplay_zh} - Y", null, null
@@ -126,7 +126,7 @@ public static class OverlayManager {
 			rule.ValueChanged += (_, _) => info.NotifyChange();
 			info.RuleY = rule;
 
-			rule = new RuleInfo(mod_id, $"{name}.Size", "Overlay", typeof(uint), 10, 0, 65535);
+			rule = RuleFactory.Create(mod_id, $"{name}.Size", "Overlay", typeof(uint), 10, 0, 65535);
 			RuleManager.Register(rule);
 			LanguageManager.AddContent($"{mod_id}.Overlay.{name}.Size",
 				$"{desplay_en} - Size", $"{desplay_zh} - 字体大小", null, null
@@ -134,7 +134,7 @@ public static class OverlayManager {
 			rule.ValueChanged += (_, _) => info.NotifyChange();
 			info.RuleS = rule;
 
-			rule = new RuleInfo(mod_id, $"{name}.Alignment", "Overlay", typeof(OverlayAlignment), OverlayAlignment.Middle, null, null);
+			rule = RuleFactory.Create(mod_id, $"{name}.Alignment", "Overlay", typeof(OverlayAlignment), OverlayAlignment.Middle, null, null);
 			RuleManager.Register(rule);
 			LanguageManager.AddContent($"{mod_id}.Overlay.{name}.Alignment",
 				$"{desplay_en} - Alignment", $"{desplay_zh} - 对齐方式", null, null
@@ -142,7 +142,7 @@ public static class OverlayManager {
 			rule.ValueChanged += (_, _) => info.NotifyChange();
 			info.RuleA = rule;
 
-			rule = new RuleInfo(mod_id, $"{name}.Color", "Overlay", typeof(Color), new Color(1, 1, 1, 1), null, null);
+			rule = RuleFactory.Create(mod_id, $"{name}.Color", "Overlay", typeof(Color), new Color(1, 1, 1, 1), null, null);
 			RuleManager.Register(rule);
 			LanguageManager.AddContent($"{mod_id}.Overlay.{name}.Color",
 				$"{desplay_en} - Color", $"{desplay_zh} - 字体颜色", null, null

@@ -456,7 +456,7 @@ public sealed class RoxyGui {
 
 	/// <summary>规则卡片行：名称标签（可翻译）+ 中部控件区 + 右侧重置按钮。</summary>
 	private float AddRuleRow(RuleInfo rule, float y) {
-		float height = rule.RuleType == RuleType.Color ? 152 : UiFactory.RowHeight;
+		float height = GetControlHeight(rule);
 		RectTransform row = UiFactory.CreateRoundedPanel("Rule_" + rule.Name, RuleContent!, UiFactory.PanelLight);
 		UiFactory.PlaceRow(row, RuleContent!, y, height);
 		row.offsetMin = new Vector2(6, row.offsetMin.y);
@@ -471,18 +471,87 @@ public sealed class RoxyGui {
 		control.offsetMin = new Vector2(220, 0);
 		control.offsetMax = new Vector2(-44, 0);
 
-		switch (rule.RuleType) {
-		case RuleType.Switch: BuildSwitchControl(rule, control); break;
-		case RuleType.SliderInt: BuildNumericControl(rule, control, true); break;
-		case RuleType.SliderFloat: BuildNumericControl(rule, control, false); break;
-		case RuleType.Options: BuildOptionsControl(rule, control); break;
-		case RuleType.Color: BuildColorControl(rule, control); break;
-		case RuleType.String: BuildStringControl(rule, control); break;
-		}
+		BuildRuleControl(rule, control);
 
 		Button reset = UiFactory.CreateButton("Reset", row, "↺", () => { rule.SetValue(rule.DefaultValue, true); BuildRulePanel(); }, 28, 28);
 		UiFactory.SetRect(reset.GetComponent<RectTransform>(), new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-12, 0), new Vector2(28, 28));
 		return height;
+	}
+
+	// ---------------- 控件构建注册表 ----------------
+
+	/// <summary>控件构建器：在 control 区内构建某个 RuleInfo 的编辑控件，返回占用的行高。</summary>
+	private delegate float ControlBuilder(RuleInfo rule, RectTransform control, RoxyGui gui);
+
+	/// <summary>
+	/// 具体类型 → 构建器注册表（内建类型在此登记）。
+	/// 泛型子类（NumericRule&lt;T&gt; / OptionsRule&lt;TEnum&gt;）由 <see cref="FindBuilder"/> 按泛型定义匹配。
+	/// 新增自定义 Rule 时：数据层写子类，GUI 层在此登记构建器即可，无需改动其他分支。
+	/// </summary>
+	private static readonly Dictionary<Type, ControlBuilder> ControlBuilders = new() {
+		[typeof(SwitchRule)] = BuildSwitchControlFor,
+		[typeof(ColorRule)] = BuildColorControlFor,
+		[typeof(StringRule)] = BuildStringControlFor,
+	};
+
+	/// <summary>查找 RuleInfo 对应的控件构建器（先精确类型，再泛型定义）。</summary>
+	private static ControlBuilder? FindBuilder(RuleInfo rule) {
+		Type type = rule.GetType();
+		if (ControlBuilders.TryGetValue(type, out var builder))
+			return builder;
+		if (type.IsGenericType) {
+			Type definition = type.GetGenericTypeDefinition();
+			if (definition == typeof(NumericRule<>))
+				return BuildNumericControlFor;
+			if (definition == typeof(OptionsRule<>))
+				return BuildOptionsControlFor;
+		}
+		return null;
+	}
+
+	/// <summary>规则行高：Color 需要更多纵向空间，其余统一行高。</summary>
+	private static float GetControlHeight(RuleInfo rule) {
+		return rule is ColorRule ? 152f : UiFactory.RowHeight;
+	}
+
+	/// <summary>按注册表分发控件构建；未登记的类型回退为字符串输入框并记录警告。</summary>
+	private void BuildRuleControl(RuleInfo rule, RectTransform control) {
+		ControlBuilder? builder = FindBuilder(rule);
+		if (builder == null) {
+			Debug.LogError($"[RoxyLib] no control builder for rule type '{rule.GetType().Name}'; fallback to String");
+			builder = BuildStringControlFor;
+		}
+		builder(rule, control, this);
+	}
+
+	private static float BuildSwitchControlFor(RuleInfo rule, RectTransform control, RoxyGui gui) {
+		gui.BuildSwitchControl(rule, control);
+		return UiFactory.RowHeight;
+	}
+
+	private static float BuildNumericControlFor(RuleInfo rule, RectTransform control, RoxyGui gui) {
+		gui.BuildNumericControl(rule, control, !IsFloatingType(rule.FieldType));
+		return UiFactory.RowHeight;
+	}
+
+	private static float BuildOptionsControlFor(RuleInfo rule, RectTransform control, RoxyGui gui) {
+		gui.BuildOptionsControl(rule, control);
+		return UiFactory.RowHeight;
+	}
+
+	private static float BuildColorControlFor(RuleInfo rule, RectTransform control, RoxyGui gui) {
+		gui.BuildColorControl(rule, control);
+		return 152f;
+	}
+
+	private static float BuildStringControlFor(RuleInfo rule, RectTransform control, RoxyGui gui) {
+		gui.BuildStringControl(rule, control);
+		return UiFactory.RowHeight;
+	}
+
+	/// <summary>浮点类型判断：决定数值输入框用 int.Parse 还是 float.Parse。</summary>
+	private static bool IsFloatingType(Type type) {
+		return type == typeof(float) || type == typeof(double) || type == typeof(decimal);
 	}
 
 	/// <summary>Switch 规则控件：开关 + 快捷键绑定按钮 + 快捷键清除按钮（✕ = 设为空 None）。</summary>

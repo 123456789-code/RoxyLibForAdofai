@@ -4,10 +4,7 @@ namespace RoxyExample;
 
 [RoxyMod(ModId = "RoxyExample")]
 public static class ExampleRules {
-	[RoxyRule(
-		Category = "Gameplay",
-		Min = 0.5f, Max = 3f
-	)]
+	[RoxyRule(Category = "Gameplay", Min = 0.5f, Max = 3f)]
 	public static float Speed = 1.0f;
 
 	[RoxyRule(Category = "Visual")]

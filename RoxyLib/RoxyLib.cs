@@ -95,7 +95,7 @@ public static class RoxyLib {
 			Storage.LoadAll(rules, host.Path);
 			foreach (RuleInfo rule in rules) {
 				rule.ValueChanged += (sender, args) => Dirty = true;
-				if (rule.RuleType == RuleType.Switch) {
+				if (rule is SwitchRule) {
 					RuleInfo captured = rule; // 防御性写法，防止lambda问题
 					rule.Keybind!.Activated += () => captured.SetValue(!(bool)captured.GetValue(), true);
 				}

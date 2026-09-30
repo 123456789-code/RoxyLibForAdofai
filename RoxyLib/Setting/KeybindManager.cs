@@ -13,7 +13,7 @@ public static class KeybindManager {
 	public static void UpdateKeybindings() {
 		Keybinds.Clear();
 		foreach (var rule in RuleManager.GetRules())
-			if (rule.RuleType == RuleType.Switch && rule.Keybind is Keybind k)
+			if (rule is SwitchRule && rule.Keybind is Keybind k)
 				Keybinds.Add(k);
 	}
 
