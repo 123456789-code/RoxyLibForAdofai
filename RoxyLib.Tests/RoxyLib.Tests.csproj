@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net481</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\RoxyLib\RoxyLib.csproj" />
+		<ProjectReference Include="..\RoxyExample\RoxyExample.csproj" />
+		<Reference Include="UnityEngine.CoreModule" HintPath="$(GameManagedDir)\UnityEngine.CoreModule.dll" Private="false" />
+		<Reference Include="UnityEngine.InputLegacyModule" HintPath="$(GameManagedDir)\UnityEngine.InputLegacyModule.dll" Private="false" />
+		<Reference Include="UnityModManager" HintPath="$(GameManagedDir)\UnityModManager\UnityModManager.dll" Private="false" />
+		<Reference Include="Newtonsoft.Json" HintPath="$(GameManagedDir)\Newtonsoft.Json.dll" Private="false" />
+		<Reference Include="System.Drawing" />
+	</ItemGroup>
+</Project>

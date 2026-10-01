@@ -1,288 +1,201 @@
-# RoxyLib (RLA)
+﻿# RoxyLib for ADOFAI
 
-为 **A Dance of Fire and Ice（冰与火之舞）** 打造的 Unity mod 开发库，设计对标 Minecraft 的 **malilib**：业务 mod 只需定义规则字段 + 一行注册，即可自动获得 **设置 GUI、多语言、配置持久化、快捷键绑定** 等能力。
+面向 Unity Mod Manager 的规则与设置库。规则类型、持久化、快捷键与 GUI 各自独立；业务 mod 可以注册自己的值类型、声明通用编辑控件，或提供 ImGui 绘制回调。
 
-- **RoxyLib**：库本体（一个独立的 UMM mod，`Id = "RoxyLib"`）
-- **RoxyExample**：示例业务 mod，展示完整用法（`Requirements: ["RoxyLib"]`）
+本次重构不兼容旧 API 和旧配置。旧 Overlay 功能已移除。设计记录见 [重构说明](docs/refactor-audit.md)，依赖和恢复方法见 [依赖说明](docs/dependency-plan.md)。
 
----
+## 设置页
 
-## 特性
+全屏深色设置页参考 [CheryTools](https://github.com/adofaiex/CheryTools) 的视觉风格，采用 ImGui.NET。支持按 mod / 分类浏览、搜索、数值滑块与精确输入、布尔值及快捷键、枚举、颜色、文字和恢复默认值。
 
-| 特性 | 说明 |
-|---|---|
-| 声明式规则 | 用 `[RoxyMod]` + `[RoxyRule]` 注解静态字段，自动注册 |
-| 六种规则类型 | Switch / SliderInt / SliderFloat / Options / Color / String |
-| 全自动 GUI | UGUI 实时构建的设置窗口，左栏 mod 列表 + 右栏规则面板，含搜索 |
-| 多语言 | 内建 en-us / zh-cn / ja-jp / ko-kr，切语言即时刷新，回退链容错 |
-| 配置持久化 | 每 mod 一个 `config.json`，原子写入、防抖保存 |
-| 快捷键 | Switch 规则可绑定组合键（Ctrl/Shift/Alt + 主键），无默认热键 |
-| 无需默认值 | 设计哲学：**任何 mod 都不应拥有默认快捷键** |
+![设置页软件预览](docs/previews/settings.png)
 
----
+上图来自真实 ImGui 绘制数据的软件预览，尚非游戏截图；另有 [较小尺寸预览](docs/previews/settings-compact.png)。
 
-## 目录结构
+从 UMM 的 RoxyLib 面板点击“打开设置”。所有规则初始均不绑定快捷键。设置页打开状态只在本次运行有效，打开设置的快捷键可保存。
 
-```
-RoxyLibForAdofai/
-├── RoxyLib/                      # 库本体（独立 UMM mod）
-│   ├── RoxyLib.cs                # 核心入口：Register / Tick / SaveAll / OpenSettings
-│   ├── RoxyLibRules.cs           # RoxyLib 自身规则（OpenSettings / Language / DebugLogLevel）
-│   ├── Main.cs                   # RoxyLib 的 UMM 入口（注册自身 + 驱动 Tick + UMM 面板按钮）
-│   ├── Rules.cs                  # 规则系统（RoxyRuleType / RuleInfo / RoxyRules）
-│   ├── Input.cs                  # 快捷键（KeyCombination / RoxyKeybind / RoxyInput）
-│   ├── Lang.cs                   # 本地化（LanguageEnum / RoxyLang）
-│   ├── Storage.cs                # 配置读写（RoxyStorage）
-│   ├── Host.cs                   # mod 宿主抽象（RoxyHost / RoxyHosts.FromUmm）
-│   ├── Gui.cs                    # 主题（#66CCFF）+ UGUI 控件工厂（UiFactory）
-│   ├── GuiWindow.cs              # 设置主窗口（RoxyGui）
-│   ├── DropdownControl.cs        # 库级下拉组件（RoxyDropdown）
-│   ├── Info.json                 # UMM 元数据
-│   └── lang/                     # RoxyLib 自身翻译表
-├── RoxyExample/                  # 示例业务 mod
-│   ├── Main.cs                   # 一行注册
-│   ├── ExampleRules.cs           # 示例规则
-│   ├── Info.json
-│   └── lang/
-├── Directory.Build.props         # 全局构建配置（游戏路径、清理 target）
-├── RoxyLibForAdofai.slnx         # 解决方案
-└── Run.bat                       # 一键部署到游戏 Mods 目录
-```
+文字在回车、失去编辑焦点、切换分类或关闭页面时提交。无效输入保留并显示错误，需修正或重置后再关闭。规则改动防抖保存，保存失败会保留待保存状态并显示重试按钮。
 
----
+## 接入 mod
 
-## 快速开始（业务 mod 开发者）
-
-### 1. 项目引用
-
-在业务 mod 的 `.csproj` 中加入对 RoxyLib 的**私有引用**（`Private="false"`，不把 RoxyLib.dll 打进业务 mod 目录，而是由 UMM 先加载独立 RoxyLib）：
-
-```xml
-<ProjectReference Include="..\RoxyLib\RoxyLib.csproj" Private="false" />
-```
-
-> 部署模型（对标 malilib）：**RoxyLib.dll 只存在于 `Mods\RoxyLib\`**，业务 mod 通过 `Info.json` 的 `Requirements: ["RoxyLib"]` 声明依赖。
-
-### 2. 定义规则类
-
-用 `[RoxyMod]` 标记容器类（指定 `ModId`），用 `[RoxyRule]` 标记静态字段：
+业务项目引用 RoxyLib，UMM 的 Info.json 中声明 `"Requirements": ["RoxyLib"]`。在 Setup 中先注册扩展类型和原有回调，再调用：
 
 ```csharp
-using RoxyLib.Rules;
+public static void Setup(UnityModManager.ModEntry mod_entry) {
+	RoxyLib.RoxyLib.Register(mod_entry);
+}
+```
 
-namespace MyMod;
+Register 安装 UMM 生命周期回调，不立即扫描字段。启用时先扫描当前 mod 的规则、恢复默认值并载入配置，再调用业务 mod 原有 OnToggle(true)。扫描或启用失败会清理该次注册。重复 Register 同一个 ModEntry 不会重复订阅。
+
+原有 OnToggle、OnSaveGUI 会保留。请在 Register 之前设置它们，之后不要重新覆盖这两个委托。禁用前会尝试保存；保存失败时拒绝禁用，避免静默丢失修改。有活动的依赖 mod 时需先禁用它们，再禁用 RoxyLib。
+
+```csharp
+using RoxyLib.Attribute;
 
 [RoxyMod(ModId = "MyMod")]
-public static class MyModRules {
-	// Switch：bool，自动获得开关 + 快捷键绑定
-	[RoxyRule(Category = "General")]
-	public static bool EnableFeature = true;
-
-	// SliderFloat：需 Min/Max，滑条 + 输入框
+public static class MyRules {
 	[RoxyRule(Category = "Gameplay", Min = 0.5f, Max = 3f)]
-	public static float Speed = 1.0f;
+	public static float Speed = 1f;
 
-	// SliderInt：需 Min/Max
-	[RoxyRule(Category = "Gameplay", Min = 0, Max = 100)]
-	public static int ComboLimit = 50;
+	[RoxyRule(Category = "General")]
+	public static bool Enabled = true;
 
-	// Options：枚举，自动生成下拉框
-	[RoxyRule(Category = "Visual")]
-	public static TrailStyle Trail = TrailStyle.Glow;
-
-	// Color：UnityEngine.Color（含 alpha，序列化 #RRGGBBAA）
-	[RoxyRule(Category = "Visual")]
-	public static UnityEngine.Color TrailColor = new UnityEngine.Color(1f, 1f, 1f, 1f);
-
-	// String：文本输入框
-	[RoxyRule(Category = "Visual")]
-	public static string Label = "Hello";
+	[RoxyRule(Category = "General", Persistent = false)]
+	public static bool SessionFlag;
 }
-
-public enum TrailStyle { Glow, Stripes, Fade }
 ```
 
-> ⚠️ **Slider（整型/浮点）必须提供 `Min` 和 `Max`**，否则注册时抛 `InvalidOperationException`（编译期无法校验，运行时检查）。
+字段必须 public static、可写且非 null。数值要求 Min < Max，默认值必须在范围内。重复 ModId / 分类 / 名称会拒绝注册；分类和名称不能包含点号。
 
-### 3. 一行注册
+读取字段可直接用于业务逻辑。修改请使用规则实例，让校验、通知和自动保存一起生效：
 
 ```csharp
-using UnityModManagerNet;
+RuleInfo rule = RuleManager.Find("MyMod", "Gameplay.Speed")!;
+if (!rule.TrySetValue(1.5f, out string? error)) {
+	// 显示或记录 error。
+}
+rule.ValueChanged += changed => {
+	float speed = changed.GetValue<float>();
+	// 应用新值。
+};
+```
 
-namespace MyMod;
+TrySetValue 要求精确的 CLR 类型；TrySetText 使用类型注册的解析器。赋相同值不通知；配置初始加载不发送 ValueChanged。业务 OnToggle(true) 中能读取已加载的值。重新启用后的“重置”仍使用首次声明的默认值。
 
-public static class Main {
-	public static void Setup(UnityModManager.ModEntry mod_entry) {
-		RoxyLib.RoxyLib.Register(mod_entry);   // 生命周期全权接管
-	}
+## 注册规则类型
+
+RuleType<T> 负责稳定类型 ID、序列化、解析和校验，不依赖 GUI：
+
+```csharp
+RuleTypeRegistry.Register(new RuleType<RangeValue>(
+	"my-mod/range",
+	value => value.Minimum.ToString("R", CultureInfo.InvariantCulture)
+		+ ";" + value.Maximum.ToString("R", CultureInfo.InvariantCulture),
+	ParseRange,
+	value => value.Minimum >= 0 && value.Maximum <= 100 && value.Minimum <= value.Maximum
+		? null : "要求 0 <= 最小值 <= 最大值 <= 100。"));
+
+private static bool ParseRange(string text, out RangeValue value) {
+	value = default;
+	string[] parts = text.Split(';');
+	if (parts.Length != 2
+		|| !double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double minimum)
+		|| !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double maximum))
+		return false;
+	value = new RangeValue(minimum, maximum);
+	return true;
 }
 ```
 
-RoxyLib 会自动完成：扫描规则 → 加载语言 → 读取配置 → 接线（值变更自动防抖保存、快捷键触发改值）→ 注册进 GUI。
+RangeValue 的定义及完整接入见 [CustomRuleTypes.cs](RoxyExample/CustomRuleTypes.cs)。序列化应使用固定文化格式并能往返解析；复杂值推荐不可变 struct 或不可变对象，编辑时返回新值。
 
-### 4. `Info.json`
+默认按精确 CLR 类型推断，所以已注册的 RangeValue 字段直接使用 [RoxyRule] 即可。一个 CLR 类型需要多种表示时，以 `infer_for_fields: false` 注册额外类型，再用 `[RoxyRule(TypeId = "my-mod/alternative")]` 明确选择。
+
+未注册类型会报错，不再自动当作字符串。重复类型 ID 或重复推断注册会报错。注册返回 IDisposable，释放会注销类型；请先移除使用该类型的规则，再释放对应类型与编辑器注册。示例保留注册至进程退出，可反复启用/禁用 mod。
+
+内置支持 bool、string、所有常见整数、float、double、decimal、枚举、UnityEngine.Color。整数和 decimal 精确存储；浮点使用固定文化与往返格式，不接受 NaN/Infinity；颜色为 #RRGGBBAA（8 位通道）。数值滑块适合粗调，输入框保留完整精度。
+
+## 扩展 GUI：两种方式
+
+同一类型 ID 选择一种编辑器，重复注册会报错。两种方式都写回 RuleInfo，统一经过类型校验。
+
+**声明通用控件**：支持 Text、Number、Toggle、OptionsList；可组合多个字段。读函数取出组件值，写函数返回完整新值。
+
+```csharp
+RuleEditorRegistry.RegisterSchema("my-mod/range", new RuleEditorSchema(
+	EditorField.Number<RangeValue, double>(
+		"Minimum", value => value.Minimum,
+		(value, next) => new RangeValue(next, value.Maximum), 0, 100),
+	EditorField.Number<RangeValue, double>(
+		"Maximum", value => value.Maximum,
+		(value, next) => new RangeValue(value.Minimum, next), 0, 100)));
+```
+
+**自定义 ImGui 绘制器**：用于通用控件难以表达的编辑方式。
+
+```csharp
+RuleEditorRegistry.RegisterCustom("example/percentage", context => {
+	float value = (float)context.GetValue<Percentage>().Value;
+	ImGui.SetNextItemWidth(-1);
+	if (ImGui.SliderFloat("##value", ref value, 0, 1))
+		context.SetValue(new Percentage(value));
+});
+```
+
+回调在 RoxyLib 的 ImGui context 和独立规则 ID 作用域中执行。Begin/End、Push/Pop 必须配对；不要切换 context 或开始/结束 frame。当前渲染后端提供标准控件、文字和几何图形，尚未提供外部纹理注册及原生 draw callback 支持。缺少编辑器的类型以只读值显示。
+
+RoxyExample 同时演示了双数值通用编辑器和自定义进度编辑器，二者均通过字段注册使用。
+
+## 运行时注册
+
+mod 已启用后可添加、移除规则：
+
+```csharp
+RuleInfo runtime = RuleManager.Register(new RuleInfo(
+	"MyMod", "Enabled", "Dynamic",
+	RuleTypeRegistry.Resolve(typeof(bool)), false));
+RuleManager.Remove(runtime);
+```
+
+动态注册立即接入已保存配置、快捷键、自动保存和 GUI。移除时记住当前值；同一会话重新注册相同标识可取回值。Registered 通知在配置载入后发出；注册回调抛异常会回滚这条规则，Removed 回调异常会被记录并继续清理。所有注册、修改和 GUI API 均在 Unity 主线程调用。
+
+## 快捷键与输入
+
+- 仅 bool 规则支持快捷键，初始值为 None。
+- 支持 Ctrl / Shift / Alt 与一个主键；左右修饰键等价，额外修饰键不会误匹配。
+- 相同组合同时切换所有对应规则；按住不重复触发。
+- GUI 打开或捕获期间暂停规则快捷键；释放后重新按下才响应。
+- Esc 在捕获时取消捕获，否则关闭设置页。
+- 打开设置页会屏蔽 Unity EventSystem、UMM 的 OnGUI，以及当前游戏的 RDInput 托管输入入口；关闭后再保留一帧输入屏蔽。
+- 其他 mod 若绕过这些入口、直接轮询 Unity Input，需要自行检查 `RoxyLib.RoxyLib.IsInputBlocked`。不要把这一机制视为对任意第三方输入代码的全局拦截。
+
+ImGui 使用独立 context，不写 imgui.ini / imgui_log.txt。打开/关闭时管理鼠标可见性、锁定状态和 Unity IME；原生库版本不匹配会拒绝初始化。
+
+## 配置与本地化
+
+每个 mod 自己的目录存放 config.json：
 
 ```json
 {
-	"Id": "MyMod",
-	"DisplayName": "My Mod",
-	"Author": "You",
-	"Version": "0.1.0",
-	"ManagerVersion": "0.28.0",
-	"AssemblyName": "MyMod.dll",
-	"EntryMethod": "MyMod.Main.Setup",
-	"Requirements": [ "RoxyLib" ]
+	"Version": 1,
+	"ModId": "MyMod",
+	"Rules": { "Gameplay.Speed": "1.5" },
+	"Keybinds": { "General.Enabled": "Ctrl+K" }
 }
 ```
 
-### 5. 部署
+按 mod 独立防抖，最后一次变更 0.5 秒后保存，失败重试间隔至少 1 秒。写入前先完成序列化，再以临时文件替换；失败保留原配置和待保存状态。尚未注册的配置项会保留，供之后注册的规则使用。
 
-```
-<游戏根目录>\Mods\RoxyLib\
-<游戏根目录>\Mods\MyMod\        (MyMod.dll + Info.json + lang/)
-```
+Persistent=false 只禁止值持久化，不影响 bool 快捷键保存。读取时一条无效值不阻断其他条目。损坏、旧版本或 ModId 不匹配的整个配置不会被覆盖：将原文件移到备份位置后，可以在设置页点击重试保存本次有效设置。旧配置不自动迁移。
 
-UMM 会先加载 RoxyLib，再按 `Requirements` 加载你的 mod。
+语言文件为 mod 目录的 lang/en-us.json、zh-cn.json、ja-jp.json、ko-kr.json。只加载本 mod ID 前缀的条目，回退顺序：当前语言 → 英文 → 调用方提供的文本。
 
----
+| 内容 | 键 |
+| --- | --- |
+| 规则名 / 描述 | MyMod.Gameplay.Speed / MyMod.Gameplay.Speed.Desc |
+| 分类 | MyMod.Category.Gameplay |
+| 通用编辑器标签 | MyMod.Extensions.Range.Editor.Minimum |
 
-## 规则类型参考
+当前提供中英文界面。其他语言缺失时回退英文；字体主要覆盖拉丁文字、简体中文及其包含的日文字符，未另行加入韩文字体。
 
-| 类型 | C# 字段类型 | 注解要求 | GUI 控件 |
-|---|---|---|---|
-| `Switch` | `bool` | 无 | 开关 + 快捷键绑定/清除 |
-| `SliderInt` | `int` / `long` / 等整型 | `Min`、`Max` | 滑块 + 输入框 |
-| `SliderFloat` | `float` / `double` / `decimal` | `Min`、`Max` | 滑块 + 输入框 |
-| `Options` | 任意枚举 | 无 | 下拉框（库级 RoxyDropdown） |
-| `Color` | `UnityEngine.Color` | 无 | RGBA 四条滑块 + 输入框 + 实时色块 |
-| `String` | `string` | 无 | 文本输入框 |
+## 构建、验证与部署
 
-> 字段值即**初始默认值**；每条规则行尾的 ↺ 按钮可恢复该默认值。
+目标为 Windows x64、net481。使用现有 .NET SDK / Framework 引用程序集和游戏 Managed 目录，游戏路径在 Directory.Build.props。新增依赖均为固定版本并有 packages.lock.json；具体清单见 [依赖说明](docs/dependency-plan.md)。
 
----
+在项目目录运行：
 
-## 配置持久化
-
-每个 mod 一个 `config.json`，存放在 mod 目录下：
-
-```json
-{
-	"ModId": "RoxyExample",
-	"Rules": {
-		"Gameplay.Speed": "1.25",
-		"Visual.ShowStats": "true",
-		"General.Language": "zh_cn"
-	},
-	"Keybinds": {
-		"General.EnableFeature": "LeftControl+K"
-	}
-}
+```powershell
+./scripts/Build.ps1 -Restore -Test
+./scripts/Build.ps1 -Format -VerifyStyle -Test
 ```
 
-- 规则值变更后 **0.5s 防抖自动保存**（也有 `OnSaveGUI` 兜底）。
-- 写入为**原子写**（`.tmp` + 移动），避免中断损坏。
-- 配置读取优先级：**config 最优先**（持久化过的值/快捷键以 config 为准）。
+Restore 仅使用项目 .packages；没有 Restore 时离线构建。脚本把 CLI、下载缓存和临时文件限制在项目中，并在退出时恢复进程环境变量。测试不用额外测试框架，写入 RoxyLib.Tests/obj/test-data，生成实际 ImGui 绘制数据的软件预览。它验证规则、配置、生命周期、快捷键、编辑提交和原生 GUI，但不代替 Unity 内的验收。
 
----
+RoxyLib/bin/Debug/net481 中的 RoxyLib.dll、ImGui.NET.dll、三个 System 依赖、cimgui.dll、Info.json、lang、Resources 必须一起分发。业务 mod 保持对已安装 RoxyLib 的引用。仓库现有 Run.bat 会写入游戏 Mods 目录；构建与测试脚本不调用它。
 
-## 本地化
+游戏内需再验收全屏缩放、底层输入隔离、鼠标恢复、中文输入法、与其他 mod 共存及退出/重启后的保存。本次重构未自动部署或启动游戏。
 
-- 语言是 RoxyLib 自身注册的一条 Options 规则（`General.Language`），在设置面板里通过下拉切换。
-- 支持：`en-us`、`zh-cn`、`ja-jp`、`ko-kr`。
-- 语言文件放在 mod 目录的 `lang\` 下，文件名即语言代码（如 `zh-cn.json`）。
+## 许可
 
-**键格式**：
-
-| 用途 | 键 |
-|---|---|
-| 规则名 | `{ModId}.{Category}.{RuleName}` |
-| 规则描述 | `{ModId}.{Category}.{RuleName}.Desc` |
-| 分类标题 | `{ModId}.Category.{Category}` |
-
-```json
-// lang/zh-cn.json
-{
-	"MyMod.Category.Gameplay": "玩法",
-	"MyMod.Gameplay.Speed": "全局速度",
-	"MyMod.Gameplay.Speed.Desc": "整体播放速度倍率"
-}
-```
-
-**回退链**：当前语言 → `en-us` → 代码里的 fallback 文本。缺失翻译不会报错。
-
-> RoxyLib 自身的窗口/通用文案使用 `RoxyLib.*` 前缀键（`RoxyLib.Window.Title`、`RoxyLib.Left.Title`、`RoxyLib.Search.Placeholder` 等）。
-
----
-
-## 快捷键
-
-- 仅 **Switch** 规则拥有快捷键。
-- **无默认快捷键**：所有 Switch 默认 `None`，由用户在 GUI 里绑定。
-- 点击快捷键按钮进入"请按键"捕获态：按任意主键（支持 Ctrl/Shift/Alt 组合），按 `Esc` 取消。
-- 快捷键为 `None` 时，行尾的 ✕ 清除按钮自动隐藏；绑定后才出现，用于**设回 None**。
-- 冲突策略：**不拒绝、同时触发**（两个 mod 绑同一键会都响应）。
-- 快捷键按下 = 切换 bool 值（`SetValue(!current)`，触发既有 `ValueChanged`，不新增事件）。
-
----
-
-## 设计哲学（重要约定）
-
-1. **任何 mod 都不应有默认快捷键** —— 所有 Switch 初始为 `None`。
-2. **config 最优先** —— 持久化过的值/快捷键以 config 为准（含显式 `None`）。
-3. **快捷键按下 = 改值** —— 复用既有 `ValueChanged`，不引入新事件。
-4. **语言是普通规则** —— 是 RoxyLib 自己注册的 Options 规则，不是特殊机制。
-5. **浮点用默认文化存储**（`ToString()`，不考虑德语区等小数分隔符差异）。
-6. **Color 含 alpha**，序列化为 `#RRGGBBAA`。
-7. **Slider 缺 Min/Max 运行时抛异常**（编译期无法校验）。
-
----
-
-## 构建与部署（库/开发环境）
-
-### 前置要求
-
-- **Unity 6**（`6000.3.10f1`），Mono 运行时
-- **Unity Mod Manager**（`0.32.4.0`，`0Harmony`）
-- 目标框架 **net481**
-- ADOFAI 游戏路径（在 `Directory.Build.props` 里配置）
-
-### 目录/属性
-
-`Directory.Build.props` 中的关键配置：
-
-```xml
-<GameDir>D:\Program Files (x86)\Steam\steamapps\common\A Dance of Fire and Ice</GameDir>
-<GameManagedDir>$(GameDir)\A Dance of Fire and Ice_Data\Managed</GameManagedDir>
-<GameModsDir>$(GameDir)\Mods</GameModsDir>
-```
-
-> `CleanDuplicateUnityAssemblies` target 会在构建后清理业务 mod 输出目录里被 SDK 连带复制的游戏程序集副本（`UnityEngine.SharedInternalsModule.dll`、`netstandard.dll`、`dnlib.dll` 等），避免污染 Mods 目录。**不要移除该清理**。
-
-### 构建
-
-用 Visual Studio 打开 `RoxyLibForAdofai.slnx`，重新生成 `RoxyLib` 与 `RoxyExample` 两个项目（输出到各自 `bin\Debug\net481\`）。
-
-### 部署
-
-运行仓库根目录的 `Run.bat`（robocopy 把两个项目的构建输出复制到游戏 `Mods\` 目录，排除 `*.pdb`）：
-
-```
-Mods\RoxyLib\      ← RoxyLib\bin\Debug\net481\  (RoxyLib.dll + Info.json + lang/)
-Mods\RoxyExample\  ← RoxyExample\bin\Debug\net481\
-```
-
-> ⚠️ **重要**：重新部署后请删除 `<Mods\RoxyLib\>` 与 `<Mods\RoxyExample\>` 下的旧 `*.cache` 文件。UMM 按程序集时间戳生成缓存，不清除会加载旧代码。
-
-### 验证清单
-
-- 打开 UMM → 启用 `RoxyLib` → 游戏内 UMM 面板可见"Open Config Screen"按钮
-- 打开设置窗口：左栏 mod 列表 + 右栏规则面板，可搜索
-- 语言下拉切换，界面即时刷新
-- 规则改动后 `config.json` 自动写入；重启后值回填
-- Switch 快捷键绑定 / ✕ 清除 / 冲突同触发
-
----
-
-## License
-
-MIT License
+项目使用 MIT License。新增依赖的许可证随 RoxyLib/Resources/Licenses 分发，字体许可证见 Resources/Fonts/OFL.txt。CheryTools 仅作视觉和交互参考，本次未复制其实现代码。

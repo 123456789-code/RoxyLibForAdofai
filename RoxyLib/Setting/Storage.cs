@@ -7,77 +7,85 @@ using RoxyLib.Utils;
 
 namespace RoxyLib.Setting;
 
-public static class Storage {
-	/// <summary>
-	/// 读取配置并回填规则与快捷键
-	/// 文件不存在则用默认值落盘
-	/// </summary>
-	public static void LoadAll(IReadOnlyList<RuleInfo> rules, string path) {
-		string config_path = Path.Combine(path, "config.json");
-		EnsureDirectory(config_path);
-		if (!File.Exists(config_path)) {
-			SaveAll(rules, config_path);
-			return;
+/// <summary>One session per mod. Unknown rules survive saves, including late registrations.</summary>
+internal sealed class ConfigStore {
+	private readonly string FilePath;
+	private JObject Root = new();
+	private bool Writable = true;
+	internal string? LastError { get; private set; }
+	internal ConfigStore(string path, string mod_id) {
+		FilePath = Path.Combine(path, "config.json");
+		if (File.Exists(FilePath)) {
+			try {
+				Root = JObject.Parse(File.ReadAllText(FilePath));
+				if (Root.Value<int?>("Version") != 1)
+					throw new InvalidDataException("Unsupported config version. Move the old config aside before enabling this mod.");
+				if (Root.Value<string>("ModId") != mod_id)
+					throw new InvalidDataException("Config ModId does not match.");
+				if (Root["Rules"] is not JObject || Root["Keybinds"] is not JObject)
+					throw new InvalidDataException("Rules and Keybinds must be objects.");
+			}
+			catch (Exception ex) {
+				Writable = false;
+				LastError = ex.Message;
+				RoxyLog.Error("Loading " + FilePath + " (original preserved)", ex);
+				Root = new();
+			}
+		}
+		Root["Version"] = 1;
+		Root["ModId"] = mod_id;
+		Root["Rules"] ??= new JObject();
+		Root["Keybinds"] ??= new JObject();
+	}
+	internal void Load(RuleInfo rule) {
+		try {
+			if (rule.Persistent && Root["Rules"]![rule.Key] is JToken token) {
+				if (token.Type != JTokenType.String || !rule.Load(token.Value<string>()!, out _))
+					RoxyLog.Warning("Invalid saved value for " + rule.Id + "; using default.");
+			}
+			if (rule.Keybind != null && Root["Keybinds"]![rule.Key] is JToken key) {
+				if (key.Type == JTokenType.String && KeyCombination.TryParse(key.Value<string>()!, out KeyCombination combination))
+					rule.Keybind.Combination = combination;
+				else
+					RoxyLog.Warning("Invalid saved keybind for " + rule.Id + "; using None.");
+			}
+		}
+		catch (Exception ex) { RoxyLog.Error("Loading " + rule.Id, ex); }
+	}
+	internal void Remember(RuleInfo rule) {
+		if (rule.Persistent)
+			Root["Rules"]![rule.Key] = rule.Serialize();
+		else
+			((JObject)Root["Rules"]!).Remove(rule.Key);
+		if (rule.Keybind != null)
+			Root["Keybinds"]![rule.Key] = rule.Keybind.Combination.ToString();
+	}
+	internal bool Save(IReadOnlyList<RuleInfo> rules) {
+		if (!Writable) {
+			// A user can move an unreadable config aside and retry without losing this session's edits.
+			if (File.Exists(FilePath))
+				return false;
+			Writable = true;
 		}
 		try {
-			var root = JObject.Parse(File.ReadAllText(config_path));
-			if (root["Rules"] is JObject rules_read && root["Keybinds"] is JObject keybinds_read)
-				foreach (var rule in rules) {
-					string name = $"{rule.Category}.{rule.Name}";
-					if (rules_read[name] is JToken rule_token) {
-						string raw = rule_token.Value<string>()
-							?? throw new ArgumentNullException(nameof(rule_token), "数据不能为空");
-						if (!rule.TryDeserialize(raw))
-							UnityEngine.Debug.LogWarning($"[RoxyLib] deserialize failed for '{name}' value '{raw}'");
-					}
-					if (rule is SwitchRule
-						&& keybinds_read[name] is JToken key_token)
-						rule.Keybind = new Keybind(
-							KeyCombination.Parse(key_token.Value<string>()
-								?? throw new ArgumentNullException(nameof(key_token), "数据不能为空"))
-						);
-				}
+			// Serialize everything before touching the original file.
+			foreach (RuleInfo rule in rules)
+				Remember(rule);
+			string contents = Root.ToString(Formatting.Indented);
+			Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+			string temp = FilePath + ".tmp";
+			File.WriteAllText(temp, contents);
+			if (File.Exists(FilePath))
+				File.Replace(temp, FilePath, null);
+			else
+				File.Move(temp, FilePath);
+			LastError = null;
+			return true;
 		}
-		catch (Exception e) {
-			UnityEngine.Debug.LogError($"[RoxyLib] config load failed: {config_path}: {e}");
-		}
-	}
-
-	/// <summary>
-	/// 保存规则与快捷键到 config.json
-	/// </summary>
-	public static void SaveAll(IReadOnlyList<RuleInfo> rules, string path) {
-		if (rules.Count == 0)
-			return;
-		string config_path = Path.Combine(path, "config.json");
-		EnsureDirectory(config_path);
-
-		// 填充内容
-		var root = new JObject { { "ModId", rules[0].ModId } };
-		var rules_save = new JObject();
-		var keybinds_save = new JObject();
-		foreach (var rule in rules) {
-			string name = $"{rule.Category}.{rule.Name}";
-			rules_save[name] = rule.Serialize();
-			if (rule is SwitchRule
-				&& rule.Keybind is Keybind k)
-				keybinds_save[name] = k.Combination.ToString();
-		}
-		root["Rules"] = rules_save;
-		root["Keybinds"] = keybinds_save;
-
-		// 原子写
-		string tmp_path = config_path + ".tmp";
-		File.WriteAllText(tmp_path, root.ToString(Formatting.Indented));
-		if (File.Exists(config_path))
-			File.Delete(config_path);
-		File.Move(tmp_path, config_path);
-	}
-
-	private static void EnsureDirectory(string config_path) {
-		string? directory = Path.GetDirectoryName(config_path);
-		if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) {
-			Directory.CreateDirectory(directory);
+		catch (Exception ex) {
+			LastError = ex.Message;
+			RoxyLog.Error("Saving " + FilePath, ex);
+			return false;
 		}
 	}
 }

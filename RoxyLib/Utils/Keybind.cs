@@ -1,65 +1,82 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
 namespace RoxyLib.Utils;
 
-/// <summary>
-/// 表示一个按键组合，由多个 <see cref="KeyCode"/> 组成（如 Ctrl+Shift+A）
-/// </summary>
-public readonly struct KeyCombination {
-	public KeyCode[] Keys { get; }
+[Flags]
+public enum KeyModifiers { None = 0, Control = 1, Shift = 2, Alt = 4 }
 
-	public KeyCombination(params KeyCode[] keys) {
-		Keys = keys;
+public readonly struct KeyCombination : IEquatable<KeyCombination> {
+	public KeyCode Key { get; }
+	public KeyModifiers Modifiers { get; }
+	public bool IsEmpty => Key == KeyCode.None;
+	public static KeyCombination None => default;
+	public KeyCombination(KeyCode key, KeyModifiers modifiers = KeyModifiers.None) {
+		if (!Enum.IsDefined(typeof(KeyCode), key) || IsModifier(key) || (modifiers & ~(KeyModifiers.Control | KeyModifiers.Shift | KeyModifiers.Alt)) != 0)
+			throw new ArgumentException("Invalid key combination.");
+		Key = key;
+		Modifiers = key == KeyCode.None ? KeyModifiers.None : modifiers;
 	}
-
-	public static KeyCombination None => new();
-
 	public override string ToString() {
-		return (Keys is null || Keys.Length == 0)
-			? "None"
-			: string.Join("+", Keys.Select(key => key.ToString()));
+		if (IsEmpty)
+			return "None";
+		List<string> parts = [];
+		if ((Modifiers & KeyModifiers.Control) != 0)
+			parts.Add("Ctrl");
+		if ((Modifiers & KeyModifiers.Shift) != 0)
+			parts.Add("Shift");
+		if ((Modifiers & KeyModifiers.Alt) != 0)
+			parts.Add("Alt");
+		parts.Add(Key.ToString());
+		return string.Join("+", parts);
 	}
-
-	public static KeyCombination Parse(string text) {
-		if (string.IsNullOrEmpty(text) || text == "None")
-			return None;
+	public static bool TryParse(string text, out KeyCombination combination) {
+		combination = None;
+		if (text == "None" || string.IsNullOrWhiteSpace(text))
+			return true;
+		KeyModifiers modifiers = KeyModifiers.None;
 		string[] parts = text.Split('+');
-		KeyCode[] keys = [.. parts.Select(p => (KeyCode)Enum.Parse(typeof(KeyCode), p.Trim()))];
-		return new KeyCombination(keys);
+		for (int i = 0; i < parts.Length - 1; i++) {
+			switch (parts[i].Trim()) {
+			case "Ctrl":
+				modifiers |= KeyModifiers.Control;
+				break;
+			case "Shift":
+				modifiers |= KeyModifiers.Shift;
+				break;
+			case "Alt":
+				modifiers |= KeyModifiers.Alt;
+				break;
+			default:
+				return false;
+			}
+		}
+		if (!Enum.TryParse(parts[parts.Length - 1].Trim(), out KeyCode key) || key == KeyCode.None || IsModifier(key) || !Enum.IsDefined(typeof(KeyCode), key))
+			return false;
+		combination = new(key, modifiers);
+		return true;
 	}
+	internal static bool IsModifier(KeyCode key) {
+		return key is KeyCode.LeftControl or KeyCode.RightControl or KeyCode.LeftShift or KeyCode.RightShift or KeyCode.LeftAlt or KeyCode.RightAlt;
+	}
+	public bool Equals(KeyCombination other) { return Key == other.Key && Modifiers == other.Modifiers; }
+	public override bool Equals(object? obj) { return obj is KeyCombination other && Equals(other); }
+	public override int GetHashCode() { return ((int)Key * 397) ^ (int)Modifiers; }
 }
 
-/// <summary>
-/// 单个按键绑定，包含所属 Mod、名称、当前组合，并提供状态查询和事件
-/// </summary>
 public sealed class Keybind {
-	public KeyCombination Combination { get; set {
-		field = value;
-		WasDown = IsDown();
-	} }
-	private bool WasDown { get; set; }
-	public event Action? Activated;
-
-	public Keybind(KeyCombination combination) {
-		Combination = combination;
-	}
-
-	/// <summary>
-	/// 内部轮询
-	/// </summary>
-	internal void Poll() {
-		bool is_down = IsDown();
-		bool just_pressed = is_down && !WasDown;
-		WasDown = is_down;
-		if (just_pressed) {
-			Activated?.Invoke();
+	private KeyCombination Current;
+	public KeyCombination Combination {
+		get => Current;
+		set {
+			if (Current.Equals(value))
+				return;
+			Current = value;
+			Changed?.Invoke();
 		}
 	}
-
-	public bool IsDown() {
-		KeyCode[] keys = Combination.Keys;
-		return !(keys is null || keys.Length == 0) && keys.All(UnityEngine.Input.GetKey);
-	}
+	internal event Action? Changed;
+	public Keybind(KeyCombination combination) { Current = combination; }
 }

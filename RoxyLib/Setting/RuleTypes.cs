@@ -1,126 +1,67 @@
-using System;
-using System.Reflection;
+﻿using System;
+using System.Globalization;
 using UnityEngine;
-using RoxyLib.Attribute;
 
 namespace RoxyLib.Setting;
 
-/// <summary>布尔开关规则：bool，可绑定快捷键。</summary>
-public sealed class SwitchRule : RuleInfo {
-	public SwitchRule(string mod_id, FieldInfo field, RoxyRuleAttribute attribute)
-		: base(mod_id, field, attribute) {
-	}
-
-	public SwitchRule(string mod_id, string name, string category, bool default_value)
-		: base(mod_id, name, category, typeof(bool), default_value, null, null) {
-	}
-
-	public override string Serialize() {
-		return GetValue().ToString() ?? "False";
-	}
-
-	public override bool TryDeserialize(string raw) {
-		if (bool.TryParse(raw, out bool parsed)) {
-			SetValue(parsed, false);
-			return true;
+internal static class BuiltinRuleTypes {
+	internal static void Register() {
+		RuleTypeRegistry.Register(new RuleType<bool>("core/bool", x => x ? "true" : "false", bool.TryParse));
+		RuleTypeRegistry.Register(new RuleType<string>("core/string", x => x, (string s, out string v) => { v = s; return true; }));
+		foreach (var t in new[] { typeof(byte), typeof(sbyte), typeof(short), typeof(ushort), typeof(int), typeof(uint),
+			typeof(long), typeof(ulong), typeof(float), typeof(double), typeof(decimal) }) {
+			var rule_type = (RuleType)typeof(BuiltinRuleTypes).GetMethod(nameof(Number), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+				.MakeGenericMethod(t).Invoke(null, null)!;
+			RuleTypeRegistry.Register(rule_type);
 		}
-		return false;
+		RuleTypeRegistry.Register(new RuleType<Color>("core/color", ColorText, ParseColor,
+			c => Finite01(c.r) && Finite01(c.g) && Finite01(c.b) && Finite01(c.a) ? null : "RGBA channels must be between 0 and 1."));
 	}
-}
-
-/// <summary>
-/// 数值规则：整型/浮点（int、uint、long、float、double…），滑块 + 精确输入框。
-/// 通过 <c>where T : struct, IConvertible</c> 一次覆盖整族数值类型。
-/// </summary>
-public sealed class NumericRule<T> : RuleInfo where T : struct, IConvertible {
-	public override bool IsNumericSlider => true;
-
-	public NumericRule(string mod_id, FieldInfo field, RoxyRuleAttribute attribute)
-		: base(mod_id, field, attribute) {
+	private static bool Finite01(float x) {
+		return !float.IsNaN(x) && x >= 0 && x <= 1;
 	}
 
-	public NumericRule(string mod_id, string name, string category, T default_value, object? min, object? max)
-		: base(mod_id, name, category, typeof(T), default_value, min, max) {
+	private static RuleType Number<T>() {
+		return new RuleType<T>("core/" + typeof(T).Name.ToLowerInvariant(),
+			x => x is double d ? d.ToString("R", CultureInfo.InvariantCulture) : x is float f ? f.ToString("R", CultureInfo.InvariantCulture) : Convert.ToString(x, CultureInfo.InvariantCulture)!,
+			(string s, out T v) => {
+				try { v = (T)Convert.ChangeType(s, typeof(T), CultureInfo.InvariantCulture); return true; }
+				catch { v = default!; return false; }
+			}, x => {
+				if (x is float f && (float.IsNaN(f) || float.IsInfinity(f)))
+					return "Value must be finite.";
+				if (x is double d && (double.IsNaN(d) || double.IsInfinity(d)))
+					return "Value must be finite.";
+				return null;
+			}, numeric: true);
 	}
 
-	public override string Serialize() {
-		return GetValue().ToString() ?? "";
+	internal static RuleType RegisterEnum(Type type) {
+		var rule_type = (RuleType)typeof(BuiltinRuleTypes).GetMethod(nameof(EnumType), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+			.MakeGenericMethod(type).Invoke(null, null)!;
+		RuleTypeRegistry.Register(rule_type);
+		return rule_type;
+	}
+	private static RuleType EnumType<T>() where T : struct, Enum {
+		return new RuleType<T>("core/enum/" + typeof(T).Assembly.GetName().Name + "/" + typeof(T).FullName,
+		x => x.ToString(), (string s, out T v) => Enum.TryParse(s, out v) && Enum.IsDefined(typeof(T), v),
+		v => Enum.IsDefined(typeof(T), v) ? null : "Choose a defined enum value.");
 	}
 
-	public override bool TryDeserialize(string raw) {
-		try {
-			SetValue(Convert.ChangeType(raw, typeof(T)), false);
-			return true;
-		}
-		catch {
+	private static string ColorText(Color color) {
+		return "#" + ((byte)Math.Round(color.r * 255)).ToString("X2")
+			+ ((byte)Math.Round(color.g * 255)).ToString("X2")
+			+ ((byte)Math.Round(color.b * 255)).ToString("X2")
+			+ ((byte)Math.Round(color.a * 255)).ToString("X2");
+	}
+	private static bool ParseColor(string text, out Color color) {
+		color = default;
+		if (!text.StartsWith("#", StringComparison.Ordinal) || (text.Length != 7 && text.Length != 9))
 			return false;
-		}
-	}
-}
-
-/// <summary>枚举选项规则：下拉框（EnumNames 来自 FieldType）。</summary>
-public sealed class OptionsRule<TEnum> : RuleInfo where TEnum : struct, Enum {
-	public OptionsRule(string mod_id, FieldInfo field, RoxyRuleAttribute attribute)
-		: base(mod_id, field, attribute) {
-	}
-
-	public OptionsRule(string mod_id, string name, string category, TEnum default_value)
-		: base(mod_id, name, category, typeof(TEnum), default_value, null, null) {
-	}
-
-	public override string Serialize() {
-		return GetValue().ToString() ?? "";
-	}
-
-	public override bool TryDeserialize(string raw) {
-		if (Enum.TryParse<TEnum>(raw, out TEnum parsed)) {
-			SetValue(parsed, false);
-			return true;
-		}
-		return false;
-	}
-}
-
-/// <summary>颜色规则：UnityEngine.Color，RGBA 四通道滑块。</summary>
-public sealed class ColorRule : RuleInfo {
-	public ColorRule(string mod_id, FieldInfo field, RoxyRuleAttribute attribute)
-		: base(mod_id, field, attribute) {
-	}
-
-	public ColorRule(string mod_id, string name, string category, Color default_value)
-		: base(mod_id, name, category, typeof(Color), default_value, null, null) {
-	}
-
-	public override string Serialize() {
-		var color = (Color)GetValue();
-		return "#" + ColorUtility.ToHtmlStringRGBA(color);
-	}
-
-	public override bool TryDeserialize(string raw) {
-		if (ColorUtility.TryParseHtmlString(raw, out Color parsed)) {
-			SetValue(parsed, false);
-			return true;
-		}
-		return false;
-	}
-}
-
-/// <summary>字符串规则：输入框。</summary>
-public sealed class StringRule : RuleInfo {
-	public StringRule(string mod_id, FieldInfo field, RoxyRuleAttribute attribute)
-		: base(mod_id, field, attribute) {
-	}
-
-	public StringRule(string mod_id, string name, string category, string default_value)
-		: base(mod_id, name, category, typeof(string), default_value, null, null) {
-	}
-
-	public override string Serialize() {
-		return (string)GetValue();
-	}
-
-	public override bool TryDeserialize(string raw) {
-		SetValue(raw, false);
+		string digits = text.Substring(1) + (text.Length == 7 ? "FF" : "");
+		if (!uint.TryParse(digits, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint rgba))
+			return false;
+		color = new Color((rgba >> 24) / 255f, ((rgba >> 16) & 255) / 255f, ((rgba >> 8) & 255) / 255f, (rgba & 255) / 255f);
 		return true;
 	}
 }

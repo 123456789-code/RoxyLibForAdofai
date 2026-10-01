@@ -1,36 +1,69 @@
-﻿using System.Collections.Generic;
-using HarmonyLib;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using RoxyLib.Utils;
+using UnityEngine;
 
 namespace RoxyLib.Setting;
 
-/// <summary>
-/// 按键绑定管理器
-/// </summary>
 public static class KeybindManager {
-	static readonly List<Keybind> Keybinds = [];
+	private static readonly Dictionary<RuleInfo, bool> Pressed = [];
+	private static readonly KeyCode[] Keys = ((KeyCode[])Enum.GetValues(typeof(KeyCode))).Distinct().ToArray();
+	private static int CaptureFrame;
+	public static RuleInfo? Capturing { get; private set; }
 
-	public static void UpdateKeybindings() {
-		Keybinds.Clear();
-		foreach (var rule in RuleManager.GetRules())
-			if (rule is SwitchRule && rule.Keybind is Keybind k)
-				Keybinds.Add(k);
+	public static void BeginCapture(RuleInfo rule) {
+		if (rule.Keybind == null)
+			throw new ArgumentException("This rule has no keybind.");
+		Capturing = rule;
+		CaptureFrame = Time.frameCount;
 	}
-
-	public static void Update(float dt) {
-		foreach (var keybind in Keybinds)
-			keybind.Poll();
+	public static void CancelCapture() { Capturing = null; }
+	internal static KeyModifiers ReadModifiers() {
+		KeyModifiers result = KeyModifiers.None;
+		if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
+			result |= KeyModifiers.Control;
+		if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+			result |= KeyModifiers.Shift;
+		if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt))
+			result |= KeyModifiers.Alt;
+		return result;
 	}
-}
-
-// 设置界面屏蔽输入
-[HarmonyPatch(typeof(RDInputType_Keyboard), "CheckKeyState")]
-internal static class InputBlockPatches {
-	static bool Prefix(ref bool __result) {
-		if (RoxyLibRules.OpenSettings) {
-			__result = false; // 游戏以为这个键没按
-			return false;     // 跳过原方法
+	internal static void Update(bool settings_open) {
+		RuleInfo[] rules = RuleManager.GetRules().Where(x => x.Keybind != null).ToArray();
+		foreach (RuleInfo stale in Pressed.Keys.Where(x => !rules.Contains(x)).ToArray())
+			Pressed.Remove(stale);
+		bool capturing = Capturing != null;
+		if (capturing && !rules.Contains(Capturing!))
+			CancelCapture();
+		if (Capturing != null && Time.frameCount > CaptureFrame) {
+			if (Input.GetKeyDown(KeyCode.Escape))
+				CancelCapture();
+			else {
+				foreach (KeyCode key in Keys) {
+					if (key == KeyCode.None || KeyCombination.IsModifier(key) || key == KeyCode.Escape || key >= KeyCode.Mouse0)
+						continue;
+					if (!Input.GetKeyDown(key))
+						continue;
+					Capturing.Keybind!.Combination = new KeyCombination(key, ReadModifiers());
+					CancelCapture();
+					break;
+				}
+			}
 		}
-		return true;
+		// Snapshot the open state: a toggle in this batch cannot suppress other bindings to the same chord.
+		Poll(rules, Input.GetKey, ReadModifiers(), capturing || settings_open);
+		if (settings_open && !capturing && Input.GetKeyDown(KeyCode.Escape))
+			RoxyLib.SetSettingsOpen(false);
+	}
+	internal static void Poll(IReadOnlyList<RuleInfo> rules, Func<KeyCode, bool> is_down, KeyModifiers modifiers, bool suppressed) {
+		foreach (RuleInfo rule in rules) {
+			KeyCombination combo = rule.Keybind!.Combination;
+			bool down = !combo.IsEmpty && is_down(combo.Key) && modifiers == combo.Modifiers;
+			bool previous = Pressed.TryGetValue(rule, out bool was_down) && was_down;
+			Pressed[rule] = down;
+			if (down && !previous && !suppressed)
+				rule.TrySetValue(!rule.GetValue<bool>(), out _);
+		}
 	}
 }
