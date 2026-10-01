@@ -7,7 +7,6 @@ using RoxyLib.Setting;
 using RoxyLib.Utils;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.Rendering;
 using Vector2N = System.Numerics.Vector2;
 
 namespace RoxyLib.Gui;
@@ -22,10 +21,7 @@ internal sealed class ImGuiHost : MonoBehaviour {
 	private readonly SettingsPage Page = new();
 	private readonly List<CanvasRenderer> Renderers = [];
 	private readonly List<Mesh> Meshes = [];
-	private Vector3[] Vertices = [];
-	private Vector2[] Uvs = [];
-	private Color32[] Colors = [];
-	private int[] Indices = [];
+	private readonly CanvasMeshBatch Batch = new();
 	private static readonly Dictionary<ImGuiKey, KeyCode> KeyMap = CreateKeyMap();
 	private CursorLockMode PreviousLock;
 	private bool PreviousCursor;
@@ -142,7 +138,7 @@ internal sealed class ImGuiHost : MonoBehaviour {
 			ImGui.Render();
 			frame = false;
 			if (IsOpen)
-				Render(ImGui.GetDrawData(), scale);
+				Render(ImGui.GetDrawData());
 		}
 		catch (Exception ex) {
 			if (frame)
@@ -218,56 +214,38 @@ internal sealed class ImGuiHost : MonoBehaviour {
 			map[ImGuiKey.F1 + i] = KeyCode.F1 + i;
 		return map;
 	}
-	private unsafe void Render(ImDrawDataPtr data, float scale) {
+	private void Render(ImDrawDataPtr data) {
 		int used = 0;
 		for (int list_index = 0; list_index < data.CmdListsCount; list_index++) {
 			ImDrawListPtr list = data.CmdLists[list_index];
-			int count = list.VtxBuffer.Size;
-			if (Vertices.Length < count) { Vertices = new Vector3[count]; Uvs = new Vector2[count]; Colors = new Color32[count]; }
-			var vertices = (ImDrawVert*)list.VtxBuffer.Data;
-			for (int i = 0; i < count; i++) {
-				ImDrawVert v = vertices[i];
-				Vertices[i] = new Vector3((v.pos.X - data.DisplayPos.X) * scale - Screen.width / 2f, Screen.height / 2f - (v.pos.Y - data.DisplayPos.Y) * scale, 0);
-				Uvs[i] = new Vector2(v.uv.X, v.uv.Y);
-				Colors[i] = new Color32((byte)v.col, (byte)(v.col >> 8), (byte)(v.col >> 16), (byte)(v.col >> 24));
-			}
 			for (int command_index = 0; command_index < list.CmdBuffer.Size; command_index++) {
 				ImDrawCmdPtr command = list.CmdBuffer[command_index];
-				if (command.UserCallback != IntPtr.Zero || command.ElemCount == 0)
+				if (command.UserCallback != IntPtr.Zero || command.ElemCount == 0 || command.TextureId != new IntPtr(1))
 					continue;
-				if (command.TextureId != new IntPtr(1))
-					continue; // This backend exposes only its font atlas.
-				float left = (command.ClipRect.X - data.DisplayPos.X) * scale - Screen.width / 2f;
-				float bottom = Screen.height / 2f - (command.ClipRect.W - data.DisplayPos.Y) * scale;
-				float width = (command.ClipRect.Z - command.ClipRect.X) * scale;
-				float height = (command.ClipRect.W - command.ClipRect.Y) * scale;
-				if (width <= 0 || height <= 0)
-					continue;
-				if (used == Renderers.Count) {
-					GameObject child = new("DrawCommand", typeof(RectTransform), typeof(CanvasRenderer));
-					child.transform.SetParent(transform, false);
-					Renderers.Add(child.GetComponent<CanvasRenderer>());
-					Mesh mesh = new() { indexFormat = IndexFormat.UInt32 };
-					mesh.MarkDynamic();
-					Meshes.Add(mesh);
+				for (int first = 0; first < command.ElemCount; first += Batch.Count) {
+					Batch.Build(data, list, command, first, Screen.width, Screen.height);
+					if (Batch.ClipRect.width <= 0 || Batch.ClipRect.height <= 0)
+						continue;
+					if (used == Renderers.Count) {
+						GameObject child = new("DrawCommand", typeof(RectTransform), typeof(CanvasRenderer));
+						child.transform.SetParent(transform, false);
+						Renderers.Add(child.GetComponent<CanvasRenderer>());
+						Mesh mesh = new() { indexFormat = CanvasMeshBatch.INDEX_FORMAT };
+						mesh.MarkDynamic();
+						Meshes.Add(mesh);
+					}
+					Mesh target = Meshes[used];
+					target.Clear();
+					target.SetVertices(Batch.Vertices, 0, Batch.Count);
+					target.SetUVs(0, Batch.Uvs, 0, Batch.Count);
+					target.SetColors(Batch.Colors, 0, Batch.Count);
+					target.SetIndices(Batch.Indices, 0, Batch.Count, MeshTopology.Triangles, 0);
+					CanvasRenderer renderer = Renderers[used++];
+					renderer.EnableRectClipping(Batch.ClipRect);
+					renderer.SetMaterial(Material, Atlas);
+					renderer.SetColor(Color.white);
+					renderer.SetMesh(target);
 				}
-				int elements = (int)command.ElemCount;
-				if (Indices.Length < elements)
-					Indices = new int[elements];
-				ushort* indices = (ushort*)list.IdxBuffer.Data + command.IdxOffset;
-				for (int i = 0; i < elements; i++)
-					Indices[i] = indices[i] + (int)command.VtxOffset;
-				Mesh target = Meshes[used];
-				target.Clear();
-				target.SetVertices(Vertices, 0, count);
-				target.SetUVs(0, Uvs, 0, count);
-				target.SetColors(Colors, 0, count);
-				target.SetIndices(Indices, 0, elements, MeshTopology.Triangles, 0);
-				CanvasRenderer renderer = Renderers[used++];
-				renderer.EnableRectClipping(new Rect(left, bottom, width, height));
-				renderer.SetMaterial(Material, Atlas);
-				renderer.SetColor(Color.white);
-				renderer.SetMesh(target);
 			}
 		}
 		for (int i = used; i < Renderers.Count; i++)

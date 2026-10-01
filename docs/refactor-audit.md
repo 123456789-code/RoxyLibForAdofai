@@ -32,10 +32,18 @@
 
 ## 验证和边界
 
-构建为 0 警告、0 错误，70 项断言通过。无额外测试依赖的回归程序覆盖类型注册/释放、值校验与通知、区域设置、数值边界、颜色、同键冲突、按住/捕获抑制、输入草稿、配置保护和替换、动态注册、重新启用默认值、注册回滚、翻译隔离。
+构建为 0 警告、0 错误，76 项断言通过。无额外测试依赖的回归程序覆盖类型注册/释放、值校验与通知、区域设置、数值边界、颜色、同键冲突、按住/捕获抑制、输入草稿、配置保护和替换、动态注册、重新启用默认值、注册回滚、翻译隔离和 Canvas 网格转换。
 
 测试实际加载项目内 cimgui，创建中文字体图集，绘制全屏设置页和两种外部编辑器，并在 1280×800 和 900×640 生成预览。预览是 ImGui 绘制数据的软件栅格化结果，不是游戏内截图。
 
 Unity 侧渲染、RDInput/Harmony 拦截、UMM 共存、IME 和光标行为已编译，但尚未在运行中的游戏验证。其他 mod 直接轮询 Unity Input 时需配合 IsInputBlocked。自定义 GUI 当前不支持外部纹理和原生 draw callback。
 
 回退步骤和生成物位置见 dependency-plan.md。未运行部署脚本。
+
+## 游戏内三角形错乱反馈
+
+用户提供的游戏截图出现跨屏拉伸三角形。原后端向 CanvasRenderer 提交 UInt32 网格，索引格式不匹配是主要怀疑点；先前软件预览直接读取 ImGui 原始数据，未覆盖 Unity 网格转换，因此不能排除这类问题。
+
+后端现改为 UInt16 网格，每批最多 60,000 个顶点，把 ImGui 的 IdxOffset、VtxOffset 展开为批内索引，不依赖 CanvasRenderer 的 baseVertex 行为。超过上限按完整三角形拆分，裁剪和坐标共同使用 DisplayPos / FramebufferScale。此边界与 [Unity uGUI VertexHelper 的 16 位索引和 65,000 顶点限制](https://github.com/Unity-Technologies/uGUI/blob/main/com.unity.ugui/Runtime/UGUI/UI/Core/Utility/VertexHelper.cs) 一致。
+
+软件预览现在使用生产代码 CanvasMeshBatch 转换后的网格。新增压力测试生成超过 88,000 个顶点，核对偏移、拆分后每个三角形的位置/UV/颜色、裁剪和索引完整性。它仍不能执行 Unity 原生 CanvasRenderer；修复的游戏内效果需重新部署并重启游戏复测。本次未写游戏目录，未新增依赖。

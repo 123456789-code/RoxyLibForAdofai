@@ -32,6 +32,7 @@ internal static class NativeUi {
 			io.NativePtr->LogFilename = null;
 			io.DisplaySize = new Vector2(1280, 800);
 			io.DeltaTime = 1f / 60;
+			io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset;
 			Theme.LoadFont(Path.Combine(output, "Resources", "Fonts", "NotoSansSC.ttf"));
 			io.Fonts.GetTexDataAsRGBA32(out IntPtr atlas, out int width, out int height, out int bpp);
 			byte[] pixels = new byte[width * height * bpp];
@@ -64,6 +65,7 @@ internal static class NativeUi {
 			io.DisplaySize = new Vector2(900, 640);
 			for (int i = 0; i < 3; i++) { ImGui.NewFrame(); page.Draw(); ImGui.Render(); }
 			DrawToFile(ImGui.GetDrawData(), pixels, width, height, Path.Combine(root, "settings-compact.png"), 900, 640);
+			CanvasGeometry.Run();
 			Console.WriteLine("PREVIEW: " + preview);
 			RoxyLib.Deactivate("RoxyExample");
 		}
@@ -81,45 +83,20 @@ internal static class NativeUi {
 		byte[] image = new byte[width * height * 4];
 		for (int i = 3; i < image.Length; i += 4)
 			image[i] = 255;
+		CanvasMeshBatch batch = new();
 		for (int n = 0; n < data.CmdListsCount; n++) {
 			ImDrawListPtr list = data.CmdLists[n];
-			var vertices = (ImDrawVert*)list.VtxBuffer.Data;
-			ushort* indices = (ushort*)list.IdxBuffer.Data;
 			for (int c = 0; c < list.CmdBuffer.Size; c++) {
 				ImDrawCmdPtr command = list.CmdBuffer[c];
-				if (command.UserCallback != IntPtr.Zero)
+				if (command.UserCallback != IntPtr.Zero || command.ElemCount == 0 || command.TextureId != new IntPtr(1))
 					continue;
-				int begin = (int)command.IdxOffset, end = begin + (int)command.ElemCount;
-				for (int i = begin; i + 2 < end; i += 3) {
-					ImDrawVert a = vertices[indices[i] + command.VtxOffset];
-					ImDrawVert b = vertices[indices[i + 1] + command.VtxOffset];
-					ImDrawVert v = vertices[indices[i + 2] + command.VtxOffset];
-					float determinant = (b.pos.Y - v.pos.Y) * (a.pos.X - v.pos.X) + (v.pos.X - b.pos.X) * (a.pos.Y - v.pos.Y);
-					if (Math.Abs(determinant) < 0.00001f)
-						continue;
-					int x0 = Math.Max(0, (int)Math.Max(command.ClipRect.X, Math.Floor(Math.Min(a.pos.X, Math.Min(b.pos.X, v.pos.X)))));
-					int x1 = Math.Min(width, (int)Math.Min(command.ClipRect.Z, Math.Ceiling(Math.Max(a.pos.X, Math.Max(b.pos.X, v.pos.X)))));
-					int y0 = Math.Max(0, (int)Math.Max(command.ClipRect.Y, Math.Floor(Math.Min(a.pos.Y, Math.Min(b.pos.Y, v.pos.Y)))));
-					int y1 = Math.Min(height, (int)Math.Min(command.ClipRect.W, Math.Ceiling(Math.Max(a.pos.Y, Math.Max(b.pos.Y, v.pos.Y)))));
-					for (int y = y0; y < y1; y++)
-						for (int x = x0; x < x1; x++) {
-							float u = ((b.pos.Y - v.pos.Y) * (x + 0.5f - v.pos.X) + (v.pos.X - b.pos.X) * (y + 0.5f - v.pos.Y)) / determinant;
-							float w = ((v.pos.Y - a.pos.Y) * (x + 0.5f - v.pos.X) + (a.pos.X - v.pos.X) * (y + 0.5f - v.pos.Y)) / determinant;
-							float t = 1 - u - w;
-							if (u < 0 || w < 0 || t < 0)
-								continue;
-							int tx = Math.Max(0, Math.Min(atlas_width - 1, (int)((u * a.uv.X + w * b.uv.X + t * v.uv.X) * atlas_width)));
-							int ty = Math.Max(0, Math.Min(atlas_height - 1, (int)((u * a.uv.Y + w * b.uv.Y + t * v.uv.Y) * atlas_height)));
-							int texel = (ty * atlas_width + tx) * 4;
-							float alpha = (u * (a.col >> 24) + w * (b.col >> 24) + t * (v.col >> 24)) / 255 * atlas[texel + 3] / 255;
-							int target = (y * width + x) * 4;
-							for (int channel = 0; channel < 3; channel++) {
-								int shift = channel * 8;
-								float color = u * ((a.col >> shift) & 255) + w * ((b.col >> shift) & 255) + t * ((v.col >> shift) & 255);
-								int bgra = 2 - channel;
-								image[target + bgra] = (byte)(color * atlas[texel + channel] / 255 * alpha + image[target + bgra] * (1 - alpha));
-							}
-						}
+				for (int first = 0; first < command.ElemCount; first += batch.Count) {
+					batch.Build(data, list, command, first, width, height);
+					System.Numerics.Vector4 clip = new(batch.ClipRect.xMin + width / 2f, height / 2f - batch.ClipRect.yMax,
+						batch.ClipRect.xMax + width / 2f, height / 2f - batch.ClipRect.yMin);
+					for (int i = 0; i < batch.Count; i += 3)
+						Rasterize(ToVertex(batch, i, width, height), ToVertex(batch, i + 1, width, height),
+							ToVertex(batch, i + 2, width, height), clip, image, atlas, atlas_width, atlas_height, width, height);
 				}
 			}
 		}
@@ -128,5 +105,43 @@ internal static class NativeUi {
 		try { Marshal.Copy(image, 0, locked.Scan0, image.Length); }
 		finally { bitmap.UnlockBits(locked); }
 		bitmap.Save(path, ImageFormat.Png);
+	}
+	private static ImDrawVert ToVertex(CanvasMeshBatch batch, int index, int width, int height) {
+		int vertex = batch.Indices[index];
+		UnityEngine.Color32 color = batch.Colors[vertex];
+		return new ImDrawVert {
+			pos = new Vector2(batch.Vertices[vertex].x + width / 2f, height / 2f - batch.Vertices[vertex].y),
+			uv = new Vector2(batch.Uvs[vertex].x, batch.Uvs[vertex].y),
+			col = (uint)(color.r | color.g << 8 | color.b << 16 | color.a << 24)
+		};
+	}
+	private static void Rasterize(ImDrawVert a, ImDrawVert b, ImDrawVert v, System.Numerics.Vector4 clip,
+		byte[] image, byte[] atlas, int atlas_width, int atlas_height, int width, int height) {
+		float determinant = (b.pos.Y - v.pos.Y) * (a.pos.X - v.pos.X) + (v.pos.X - b.pos.X) * (a.pos.Y - v.pos.Y);
+		if (Math.Abs(determinant) < 0.00001f)
+			return;
+		int x0 = Math.Max(0, (int)Math.Max(clip.X, Math.Floor(Math.Min(a.pos.X, Math.Min(b.pos.X, v.pos.X)))));
+		int x1 = Math.Min(width, (int)Math.Min(clip.Z, Math.Ceiling(Math.Max(a.pos.X, Math.Max(b.pos.X, v.pos.X)))));
+		int y0 = Math.Max(0, (int)Math.Max(clip.Y, Math.Floor(Math.Min(a.pos.Y, Math.Min(b.pos.Y, v.pos.Y)))));
+		int y1 = Math.Min(height, (int)Math.Min(clip.W, Math.Ceiling(Math.Max(a.pos.Y, Math.Max(b.pos.Y, v.pos.Y)))));
+		for (int y = y0; y < y1; y++)
+			for (int x = x0; x < x1; x++) {
+				float u = ((b.pos.Y - v.pos.Y) * (x + 0.5f - v.pos.X) + (v.pos.X - b.pos.X) * (y + 0.5f - v.pos.Y)) / determinant;
+				float w = ((v.pos.Y - a.pos.Y) * (x + 0.5f - v.pos.X) + (a.pos.X - v.pos.X) * (y + 0.5f - v.pos.Y)) / determinant;
+				float t = 1 - u - w;
+				if (u < 0 || w < 0 || t < 0)
+					continue;
+				int tx = Math.Max(0, Math.Min(atlas_width - 1, (int)((u * a.uv.X + w * b.uv.X + t * v.uv.X) * atlas_width)));
+				int ty = Math.Max(0, Math.Min(atlas_height - 1, (int)((u * a.uv.Y + w * b.uv.Y + t * v.uv.Y) * atlas_height)));
+				int texel = (ty * atlas_width + tx) * 4;
+				float alpha = (u * (a.col >> 24) + w * (b.col >> 24) + t * (v.col >> 24)) / 255 * atlas[texel + 3] / 255;
+				int target = (y * width + x) * 4;
+				for (int channel = 0; channel < 3; channel++) {
+					int shift = channel * 8;
+					float color = u * ((a.col >> shift) & 255) + w * ((b.col >> shift) & 255) + t * ((v.col >> shift) & 255);
+					int bgra = 2 - channel;
+					image[target + bgra] = (byte)(color * atlas[texel + channel] / 255 * alpha + image[target + bgra] * (1 - alpha));
+				}
+			}
 	}
 }
