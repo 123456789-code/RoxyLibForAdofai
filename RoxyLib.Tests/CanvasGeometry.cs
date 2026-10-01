@@ -8,6 +8,13 @@ namespace RoxyLib.Tests;
 
 internal static class CanvasGeometry {
 	internal static unsafe void Run() {
+		bool covered = true;
+		foreach ((int width, int height) in new[] { (900, 640), (1280, 800), (1921, 1081), (3840, 2160) }) {
+			UnityEngine.Vector3[] corners = CanvasMeshBatch.BackdropVertices(width, height);
+			covered &= corners[0].x < -width / 2f && corners[0].y < -height / 2f
+				&& corners[2].x > width / 2f && corners[2].y > height / 2f;
+		}
+		Regression.Check(covered, "opaque backdrop covers all physical pixel edges including odd resolutions");
 		ImGui.NewFrame();
 		ImDrawListPtr draw = ImGui.GetBackgroundDrawList();
 		draw.AddRectFilled(new Vector2(1, 2), new Vector2(11, 12), 0xFF123456);

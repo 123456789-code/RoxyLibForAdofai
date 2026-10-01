@@ -18,6 +18,10 @@ internal sealed class ImGuiHost : MonoBehaviour {
 	private Texture2D? Atlas;
 	private Material? Material;
 	private Canvas? Canvas;
+	private CanvasRenderer? Backdrop;
+	private Mesh? BackdropMesh;
+	private int BackdropWidth;
+	private int BackdropHeight;
 	private readonly SettingsPage Page = new();
 	private readonly List<CanvasRenderer> Renderers = [];
 	private readonly List<Mesh> Meshes = [];
@@ -84,6 +88,13 @@ internal sealed class ImGuiHost : MonoBehaviour {
 			Canvas.renderMode = RenderMode.ScreenSpaceOverlay;
 			Canvas.sortingOrder = short.MaxValue;
 			Canvas.enabled = false;
+			GameObject backdrop = new("FullscreenBackground", typeof(RectTransform), typeof(CanvasRenderer));
+			backdrop.transform.SetParent(transform, false);
+			Backdrop = backdrop.GetComponent<CanvasRenderer>();
+			BackdropMesh = new Mesh { indexFormat = CanvasMeshBatch.INDEX_FORMAT };
+			Backdrop.SetMaterial(Material, Texture2D.whiteTexture);
+			Backdrop.SetColor(new Color(Theme.Background.X, Theme.Background.Y, Theme.Background.Z, 1));
+			UpdateBackdrop();
 			Theme.Apply();
 		}
 		finally { ImGui.SetCurrentContext(previous); }
@@ -215,6 +226,7 @@ internal sealed class ImGuiHost : MonoBehaviour {
 		return map;
 	}
 	private void Render(ImDrawDataPtr data) {
+		UpdateBackdrop();
 		int used = 0;
 		for (int list_index = 0; list_index < data.CmdListsCount; list_index++) {
 			ImDrawListPtr list = data.CmdLists[list_index];
@@ -256,10 +268,24 @@ internal sealed class ImGuiHost : MonoBehaviour {
 			if (renderer != null)
 				renderer.Clear();
 	}
+	private void UpdateBackdrop() {
+		if (BackdropMesh == null || Backdrop == null || (BackdropWidth == Screen.width && BackdropHeight == Screen.height))
+			return;
+		BackdropWidth = Screen.width;
+		BackdropHeight = Screen.height;
+		// Physical pixel bounds are independent of ImGui's rounded logical window size.
+		BackdropMesh.vertices = CanvasMeshBatch.BackdropVertices(BackdropWidth, BackdropHeight);
+		BackdropMesh.uv = new[] { Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero };
+		BackdropMesh.colors32 = new[] { new Color32(255, 255, 255, 255), new Color32(255, 255, 255, 255), new Color32(255, 255, 255, 255), new Color32(255, 255, 255, 255) };
+		BackdropMesh.SetIndices(new ushort[] { 0, 1, 2, 0, 2, 3 }, MeshTopology.Triangles, 0);
+		Backdrop.SetMesh(BackdropMesh);
+	}
 	private void OnDestroy() {
 		SetOpen(false, discard: true);
 		foreach (Mesh mesh in Meshes)
 			Destroy(mesh);
+		if (BackdropMesh != null)
+			Destroy(BackdropMesh);
 		if (Material != null)
 			Destroy(Material);
 		if (Atlas != null)

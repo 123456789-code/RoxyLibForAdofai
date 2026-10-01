@@ -64,7 +64,7 @@ public static class RuleEditorRegistry {
 				switch (field.Kind) {
 				case EditorKind.Toggle:
 					bool on = (bool)current;
-					if (ImGui.Checkbox("##value", ref on))
+					if (Theme.Toggle("##value", ref on))
 						Apply(on);
 					break;
 				case EditorKind.Options:
@@ -81,9 +81,9 @@ public static class RuleEditorRegistry {
 			}
 			return;
 		}
-		if (rule.Type.Id == "core/bool") {
+		if (rule.ValueType == typeof(bool)) {
 			bool on = rule.GetValue<bool>();
-			if (ImGui.Checkbox("##value", ref on))
+			if (Theme.Toggle("##value", ref on))
 				rule.TrySetValue(on, out _);
 		}
 		else if (rule.Type.Id == "core/string")
@@ -93,6 +93,7 @@ public static class RuleEditorRegistry {
 		else if (rule.Type.Id.StartsWith("core/enum/", StringComparison.Ordinal))
 			DrawOptions(Enum.GetNames(rule.ValueType), rule.Serialize(), value => rule.TrySetText(value, out _));
 		else if (rule.Type.Id == "core/color") {
+			ImGui.SetNextItemWidth(-1);
 			Color color = rule.GetValue<Color>();
 			Vector4 rgba = new(color.r, color.g, color.b, color.a);
 			if (ImGui.ColorEdit4("##value", ref rgba, ImGuiColorEditFlags.AlphaBar | ImGuiColorEditFlags.DisplayHex))
@@ -131,7 +132,9 @@ public static class RuleEditorRegistry {
 		EditorState state, Func<object, bool> apply) {
 		NumericRange range = new(component_type, min, max);
 		float fraction = range.Fraction(current);
-		ImGui.SetNextItemWidth(Math.Max(80, ImGui.GetContentRegionAvail().X - 160));
+		float available = ImGui.GetContentRegionAvail().X;
+		float text_width = Math.Min(148, available * 0.42f);
+		ImGui.SetNextItemWidth(Math.Max(1, available - text_width - ImGui.GetStyle().ItemSpacing.X));
 		if (ImGui.SliderFloat("##slider", ref fraction, 0, 1, "")) {
 			if (apply(range.Interpolate(fraction)))
 				state.Forget(id);

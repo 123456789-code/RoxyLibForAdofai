@@ -12,6 +12,7 @@
 	"RoxyLib.General.OpenSettings.Desc": "Open the full screen settings page. Only the shortcut is saved.",
 	"RoxyLib.General.Language": "Language",
 	"RoxyLib.General.Language.Desc": "Choose the interface language. Missing translations fall back to English.",
+	"RoxyLib.Keybind.Capturing": "Press a key…",
 	"RoxyLib.Keybind.Press": "Press a key; Esc cancels",
 	"RoxyLib.Keybind.Clear": "Clear",
 	"RoxyLib.Save.Pending": "Saving changes...",

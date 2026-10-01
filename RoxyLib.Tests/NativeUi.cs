@@ -65,6 +65,7 @@ internal static class NativeUi {
 			io.DisplaySize = new Vector2(900, 640);
 			for (int i = 0; i < 3; i++) { ImGui.NewFrame(); page.Draw(); ImGui.Render(); }
 			DrawToFile(ImGui.GetDrawData(), pixels, width, height, Path.Combine(root, "settings-compact.png"), 900, 640);
+			CheckNavigation(page, root);
 			CanvasGeometry.Run();
 			Console.WriteLine("PREVIEW: " + preview);
 			RoxyLib.Deactivate("RoxyExample");
@@ -76,13 +77,42 @@ internal static class NativeUi {
 			FreeLibrary(library);
 		}
 	}
+	private static void CheckNavigation(SettingsPage page, string root) {
+		RoxyLib.Activate("TestMod", "Navigation test", Path.Combine(root, "navigation"), typeof(TestRules).Assembly);
+		try {
+			var type = new RuleType<string>("tests/navigation", value => value, (string text, out string value) => { value = text; return true; });
+			bool requested = false, stable = false;
+			using IDisposable registration = RuleEditorRegistry.RegisterCustom(type.Id, _ => {
+				ImGui.TextUnformatted("Navigation callback");
+				page.RequestNavigation("RoxyExample", null);
+				requested = true;
+				stable = page.SelectedMod == "TestMod";
+			});
+			RuleManager.Register(new RuleInfo("TestMod", "Navigate", "General", type, ""));
+			page.RequestNavigation("TestMod", null);
+			Regression.Check(page.SelectedMod == "RoxyExample", "queued navigation does not change the current frame");
+			ImGui.NewFrame();
+			page.Draw();
+			ImGui.Render();
+			Regression.Check(requested && stable && page.SelectedMod == "TestMod", "navigation requested while drawing preserves one selected mod for the complete frame");
+			ImGui.NewFrame();
+			page.Draw();
+			ImGui.Render();
+			Regression.Check(page.SelectedMod == "RoxyExample", "next frame applies navigation before drawing either pane");
+		}
+		finally { RoxyLib.Deactivate("TestMod"); }
+	}
 
 	// CPU rasterization of the real ImGui triangles and atlas, for inspection without starting Unity.
 	private static unsafe void DrawToFile(ImDrawDataPtr data, byte[] atlas, int atlas_width, int atlas_height,
 		string path, int width, int height) {
 		byte[] image = new byte[width * height * 4];
-		for (int i = 3; i < image.Length; i += 4)
-			image[i] = 255;
+		for (int i = 0; i < image.Length; i += 4) {
+			image[i] = (byte)(Theme.Background.Z * 255);
+			image[i + 1] = (byte)(Theme.Background.Y * 255);
+			image[i + 2] = (byte)(Theme.Background.X * 255);
+			image[i + 3] = 255;
+		}
 		CanvasMeshBatch batch = new();
 		for (int n = 0; n < data.CmdListsCount; n++) {
 			ImDrawListPtr list = data.CmdLists[n];

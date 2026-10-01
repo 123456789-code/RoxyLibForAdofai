@@ -12,6 +12,7 @@
 	"RoxyLib.General.OpenSettings.Desc": "打开全屏设置页，仅保存快捷键，不保存页面的开关状态。",
 	"RoxyLib.General.Language": "语言",
 	"RoxyLib.General.Language.Desc": "选择界面语言。缺少翻译时回退到英文。",
+	"RoxyLib.Keybind.Capturing": "请按键…",
 	"RoxyLib.Keybind.Press": "请按键，Esc 取消",
 	"RoxyLib.Keybind.Clear": "清除",
 	"RoxyLib.Save.Pending": "正在保存更改…",

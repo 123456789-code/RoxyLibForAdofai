@@ -16,6 +16,11 @@ internal sealed class CanvasMeshBatch {
 	internal ushort[] Indices = [];
 	internal int Count { get; private set; }
 	internal Rect ClipRect { get; private set; }
+	internal static Vector3[] BackdropVertices(int width, int height) {
+		float half_width = width / 2f + 1, half_height = height / 2f + 1;
+		return [new Vector3(-half_width, -half_height, 0), new Vector3(-half_width, half_height, 0),
+			new Vector3(half_width, half_height, 0), new Vector3(half_width, -half_height, 0)];
+	}
 
 	internal unsafe void Build(ImDrawDataPtr data, ImDrawListPtr list, ImDrawCmdPtr command,
 		int first_element, int framebuffer_width, int framebuffer_height) {

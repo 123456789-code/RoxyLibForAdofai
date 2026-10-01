@@ -10,9 +10,11 @@ namespace RoxyLib.Setting;
 
 /// <summary>Fullscreen navigation and settings. Owns no rule values or persistence logic.</summary>
 internal sealed class SettingsPage {
-	private string SelectedMod = RoxyLib.MOD_ID;
+	internal string SelectedMod { get; private set; } = RoxyLib.MOD_ID;
 	private string? Category;
 	private string Search = "";
+	private string? PendingMod;
+	private string? PendingCategory;
 	private readonly Dictionary<RuleInfo, EditorState> States = new();
 
 	internal void ResetTransientState() {
@@ -28,6 +30,13 @@ internal sealed class SettingsPage {
 		return success;
 	}
 	internal void Draw() {
+		// Apply navigation once, before either pane is drawn. A click cannot change this frame's expansion halfway through the loop.
+		if (PendingMod != null) {
+			SelectedMod = PendingMod;
+			Category = PendingCategory;
+			PendingMod = null;
+			ResetTransientState();
+		}
 		IReadOnlyList<ModHost> hosts = RoxyLib.GetHosts();
 		RuleInfo[] all = RuleManager.GetRules().ToArray();
 		foreach (RuleInfo stale in States.Keys.Where(x => !all.Contains(x)).ToArray())
@@ -44,11 +53,14 @@ internal sealed class SettingsPage {
 		ImGui.Begin("RoxyLib##Fullscreen", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove
 			| ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoBringToFrontOnFocus);
 		try {
+			ImGui.AlignTextToFramePadding();
 			ImGui.TextColored(Theme.Accent, "ROXY");
 			ImGui.SameLine();
 			ImGui.TextDisabled("/ " + T("RoxyLib.Window.Title", "Settings"));
-			ImGui.SameLine(Math.Max(180, io.DisplaySize.X - 120));
-			if (ImGui.Button(T("RoxyLib.Close", "Close") + "  Esc", new Vector2(80, 30)))
+			string close_label = T("RoxyLib.Close", "Close") + "  Esc";
+			float close_width = ImGui.CalcTextSize(close_label).X + ImGui.GetStyle().FramePadding.X * 2;
+			ImGui.SameLine(io.DisplaySize.X - ImGui.GetStyle().WindowPadding.X - close_width);
+			if (ImGui.Button(close_label, new Vector2(close_width, ImGui.GetFrameHeight())))
 				RoxyLib.SetSettingsOpen(false);
 			ImGui.Separator();
 			ImGui.SetNextItemWidth(-1);
@@ -61,7 +73,8 @@ internal sealed class SettingsPage {
 			}
 			ImGui.Spacing();
 			float sidebar = Math.Max(185, Math.Min(290, io.DisplaySize.X * 0.21f));
-			ImGui.BeginChild("Navigation", new Vector2(sidebar, -28), ImGuiChildFlags.Borders);
+			float footer = ImGui.GetFrameHeight();
+			ImGui.BeginChild("Navigation", new Vector2(sidebar, -footer), ImGuiChildFlags.Borders);
 			try {
 				ImGui.TextDisabled(T("RoxyLib.Left.Title", "MODS"));
 				foreach (ModHost host in hosts.OrderBy(x => x.ModId != RoxyLib.MOD_ID).ThenBy(x => x.DisplayName)) {
@@ -69,22 +82,15 @@ internal sealed class SettingsPage {
 					if (Search.Length > 0 && count == 0)
 						continue;
 					ImGui.PushID(host.ModId);
-					if (ImGui.Selectable(host.DisplayName + "  (" + count + ")", SelectedMod == host.ModId, ImGuiSelectableFlags.None, new Vector2(0, 32)) && CommitPending()) {
-						SelectedMod = host.ModId;
-						Category = null;
-						ResetTransientState();
-					}
+					if (ImGui.Selectable(host.DisplayName + "  (" + count + ")", SelectedMod == host.ModId, ImGuiSelectableFlags.None, new Vector2(0, ImGui.GetFrameHeight())))
+						RequestNavigation(host.ModId, null);
 					if (SelectedMod == host.ModId) {
 						ImGui.Indent(12);
-						if (ImGui.Selectable(T("RoxyLib.AllCategories", "All categories"), Category == null) && CommitPending()) {
-							Category = null;
-							ResetTransientState();
-						}
+						if (ImGui.Selectable(T("RoxyLib.AllCategories", "All categories"), Category == null))
+							RequestNavigation(SelectedMod, null);
 						foreach (string category in all.Where(x => x.ModId == host.ModId).Select(x => x.Category).Distinct()) {
-							if (ImGui.Selectable(LanguageManager.Translate(host.ModId + ".Category." + category, category), Category == category) && CommitPending()) {
-								Category = category;
-								ResetTransientState();
-							}
+							if (ImGui.Selectable(LanguageManager.Translate(host.ModId + ".Category." + category, category) + "##" + category, Category == category))
+								RequestNavigation(SelectedMod, category);
 						}
 						ImGui.Unindent(12);
 					}
@@ -93,7 +99,7 @@ internal sealed class SettingsPage {
 			}
 			finally { ImGui.EndChild(); }
 			ImGui.SameLine();
-			ImGui.BeginChild("Content", new Vector2(0, -28));
+			ImGui.BeginChild("Content", new Vector2(0, -footer));
 			try {
 				ModHost? selected = hosts.FirstOrDefault(x => x.ModId == SelectedMod);
 				if (selected == null)
@@ -141,6 +147,12 @@ internal sealed class SettingsPage {
 			+ " " + LanguageManager.Translate(rule.Id + ".Desc", "") + " " + LanguageManager.Translate(rule.ModId + ".Category." + rule.Category, rule.Category);
 		return text.IndexOf(Search.Trim(), StringComparison.OrdinalIgnoreCase) >= 0;
 	}
+	internal void RequestNavigation(string mod_id, string? category) {
+		if (!CommitPending())
+			return;
+		PendingMod = mod_id;
+		PendingCategory = category;
+	}
 	private void DrawRule(RuleInfo rule) {
 		if (!States.TryGetValue(rule, out EditorState? state))
 			States[rule] = state = new EditorState();
@@ -149,48 +161,88 @@ internal sealed class SettingsPage {
 			if (!ImGui.BeginTable("rule", 3, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.PadOuterX))
 				return;
 			try {
-				ImGui.TableSetupColumn("name", ImGuiTableColumnFlags.WidthStretch, 0.40f);
-				ImGui.TableSetupColumn("value", ImGuiTableColumnFlags.WidthStretch, 0.60f);
-				ImGui.TableSetupColumn("reset", ImGuiTableColumnFlags.WidthFixed, 60);
+				ImGui.TableSetupColumn("name", ImGuiTableColumnFlags.WidthStretch, 0.38f);
+				ImGui.TableSetupColumn("value", ImGuiTableColumnFlags.WidthStretch, 0.62f);
+				float reset_width = Math.Max(60, ImGui.CalcTextSize(T("RoxyLib.Rule.Reset", "Reset")).X + ImGui.GetStyle().FramePadding.X * 2);
+				ImGui.TableSetupColumn("reset", ImGuiTableColumnFlags.WidthFixed, reset_width);
 				ImGui.TableNextRow();
-				ImGui.TableNextColumn();
-				ImGui.TextWrapped(LanguageManager.Translate(rule.Id, rule.Name));
+				ImGui.TableSetColumnIndex(0);
+				float row_y = ImGui.GetCursorPosY();
+				float label_width = ImGui.GetContentRegionAvail().X;
+				string name = LanguageManager.Translate(rule.Id, rule.Name);
 				string description = LanguageManager.Translate(rule.Id + ".Desc", "");
+				float label_height = ImGui.CalcTextSize(name, false, label_width).Y;
+				if (description.Length > 0)
+					label_height += 4 + ImGui.CalcTextSize(description, false, label_width).Y;
+				float control_height = ImGui.GetFrameHeight();
+				ImGui.TableSetColumnIndex(1);
+				ImGui.SetCursorPosY(row_y + Math.Max(0, (label_height - control_height) / 2));
+				ImGui.BeginGroup();
+				try {
+					if (rule.Keybind != null)
+						DrawBoolean(rule, state);
+					else
+						RuleEditorRegistry.Draw(rule, state);
+				}
+				catch (Exception ex) { state.Error = ex.Message; }
+				ImGui.EndGroup();
+				float row_height = Math.Max(label_height, Math.Max(0, (label_height - control_height) / 2) + ImGui.GetItemRectSize().Y);
+				ImGui.TableSetColumnIndex(0);
+				// Clear the frame-control baseline inherited from the editor column before positioning plain text.
+				ImGui.Dummy(Vector2.Zero);
+				ImGui.SetCursorPosY(row_y + (row_height - label_height) / 2);
+				ImGui.BeginGroup();
+				ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(ImGui.GetStyle().ItemSpacing.X, 4));
+				ImGui.TextWrapped(name);
 				if (description.Length > 0) {
 					ImGui.PushStyleColor(ImGuiCol.Text, Theme.Muted);
 					ImGui.TextWrapped(description);
 					ImGui.PopStyleColor();
 				}
-				ImGui.TableNextColumn();
-				try { RuleEditorRegistry.Draw(rule, state); }
-				catch (Exception ex) { state.Error = ex.Message; }
-				if (rule.Keybind != null) {
-					bool capture = ReferenceEquals(KeybindManager.Capturing, rule);
-					string label = capture ? T("RoxyLib.Keybind.Press", "Press a key; Esc cancels") : rule.Keybind.Combination.ToString();
-					if (ImGui.Button(label + "##key", new Vector2(Math.Max(120, ImGui.GetContentRegionAvail().X - 62), 26)))
-						KeybindManager.BeginCapture(rule);
-					if (!rule.Keybind.Combination.IsEmpty) {
-						ImGui.SameLine();
-						if (ImGui.Button(T("RoxyLib.Keybind.Clear", "Clear"))) {
-							rule.Keybind.Combination = KeyCombination.None;
-							KeybindManager.CancelCapture();
-						}
-					}
-				}
+				ImGui.PopStyleVar();
+				ImGui.EndGroup();
+				ImGui.TableSetColumnIndex(2);
+				ImGui.SetCursorPosY(row_y + (row_height - control_height) / 2);
+				if (ImGui.Button(T("RoxyLib.Rule.Reset", "Reset"), new Vector2(reset_width, control_height))) { rule.Reset(); state.Clear(); }
 				string? error = state.Error ?? rule.Error;
 				if (error != null) {
+					ImGui.TableNextRow();
+					ImGui.TableSetColumnIndex(1);
 					ImGui.PushStyleColor(ImGuiCol.Text, Theme.Error);
 					ImGui.TextWrapped(error);
 					ImGui.PopStyleColor();
 				}
-				ImGui.TableNextColumn();
-				if (ImGui.Button(T("RoxyLib.Rule.Reset", "Reset"))) { rule.Reset(); state.Clear(); }
 			}
 			finally { ImGui.EndTable(); }
-			ImGui.Spacing();
 			ImGui.Separator();
 		}
 		finally { ImGui.PopID(); }
+	}
+	private static void DrawBoolean(RuleInfo rule, EditorState state) {
+		float available = ImGui.GetContentRegionAvail().X;
+		float gap = ImGui.GetStyle().ItemSpacing.X;
+		float height = ImGui.GetFrameHeight();
+		string clear_label = T("RoxyLib.Keybind.Clear", "Clear");
+		float clear_width = Math.Max(60, ImGui.CalcTextSize(clear_label).X + ImGui.GetStyle().FramePadding.X * 2);
+		// Keep all four controls in one row, including the disabled empty-binding reset.
+		ImGui.BeginGroup();
+		RuleEditorRegistry.Draw(rule, state);
+		ImGui.EndGroup();
+		float toggle_width = ImGui.GetItemRectSize().X;
+		ImGui.SameLine(0, gap);
+		bool capture = ReferenceEquals(KeybindManager.Capturing, rule);
+		string label = capture ? T("RoxyLib.Keybind.Capturing", "Press a key...") : rule.Keybind!.Combination.ToString();
+		if (ImGui.Button(label + "##key", new Vector2(Math.Max(1, available - toggle_width - clear_width - gap * 2), height)))
+			KeybindManager.BeginCapture(rule);
+		if (ImGui.IsItemHovered())
+			ImGui.SetTooltip(capture ? T("RoxyLib.Keybind.Press", "Press a key; Esc cancels") : label);
+		ImGui.SameLine(0, gap);
+		ImGui.BeginDisabled(rule.Keybind!.Combination.IsEmpty && !capture);
+		if (ImGui.Button(clear_label, new Vector2(clear_width, height))) {
+			rule.Keybind.Combination = KeyCombination.None;
+			KeybindManager.CancelCapture();
+		}
+		ImGui.EndDisabled();
 	}
 	private static string T(string key, string fallback) { return LanguageManager.Translate(key, fallback); }
 }
